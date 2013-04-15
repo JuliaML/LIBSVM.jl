@@ -1,0 +1,8 @@
+using RDatasets, SVM
+iris = data("datasets", "iris")
+labels = iris["Species"].data
+instances = transpose(hcat(map((i) -> iris[i].data, 2:5)...))
+model = svmtrain(labels[1:2:end], instances[:, 1:2:end])
+(class, decvalues) = svmpredict(model, instances[:, 2:2:end])
+correct = Bool[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1]
+@assert (class .== labels[2:2:end]) == correct
