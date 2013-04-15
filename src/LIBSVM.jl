@@ -14,6 +14,8 @@ const RBF = 2
 const Sigmoid = 3
 const Precomputed = 4
 
+verbosity = false
+
 immutable SVMNode
     index::Int32
     value::Float64
@@ -68,13 +70,20 @@ type SVMModel{T}
     weight_labels::Vector{Int32}
     weights::Vector{Float64}
     nfeatures::Int
+    verbose::Bool
 end
 
 let libsvm = C_NULL
     global get_libsvm
-    get_libsvm() = libsvm == C_NULL ?
-        libsvm = dlopen(joinpath(Pkg.dir(), "LIBSVM", "deps", "libsvm.so.2")) :
+    function get_libsvm()
+        if libsvm == C_NULL
+            libsvm = dlopen(joinpath(Pkg.dir(), "LIBSVM", "deps",
+                "libsvm.so.2"))
+            ccall(dlsym(libsvm, :svm_set_print_string_function), Void,
+                (Ptr{Void},), cfunction(svmprint, Void, (Ptr{Uint8},)))
+        end
         libsvm
+    end
 end
 
 macro cachedsym(symname)
@@ -125,6 +134,13 @@ function instances2nodes(instances::Array{Float64, 2})
     (nodes, nodeptrs)
 end
 
+function svmprint(str::Ptr{Uint8})
+    if verbosity::Bool
+        print(bytestring(str))
+    end
+    nothing
+end
+
 function svmtrain{T}(labels::Vector{T}, instances::Array{Float64, 2};
     svm_type::Int=CSVC, kernel_type::Int=RBF, degree::Int=3, gamma::Float64=.00,
     coef0::Float64=0.0, C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
@@ -132,6 +148,7 @@ function svmtrain{T}(labels::Vector{T}, instances::Array{Float64, 2};
     probability_estimates::Bool=false,
     weights::Union(Dict{T, Float64}, Nothing)=nothing, cv_folds::Int=0,
     verbose::Bool=false)
+    global verbosity
 
     label_dict = Dict{T, Int32}()
     reverse_labels = Array(T, 0)
@@ -171,11 +188,12 @@ function svmtrain{T}(labels::Vector{T}, instances::Array{Float64, 2};
     problem[1] = SVMProblem(int32(size(instances, 2)), pointer(idx),
         pointer(nodeptrs))
 
+    verbosity = verbose
     ptr = ccall(svm_train(), Ptr{Void}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
 
     model = SVMModel(ptr, param, reverse_labels, weight_labels, weights,
-        size(instances, 1))
+        size(instances, 1), verbose)
     finalizer(model, svmfree)
     model
 end
@@ -184,6 +202,7 @@ svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
     model.ptr)
 
 function svmpredict{T}(model::SVMModel{T}, instances::Array{Float64, 2})
+    global verbosity
     ninstances = size(instances, 2)
 
     if size(instances, 1) != model.nfeatures
@@ -194,6 +213,7 @@ function svmpredict{T}(model::SVMModel{T}, instances::Array{Float64, 2})
     class = Array(T, ninstances)
     decvalues = Array(Float64, length(model.labels), ninstances)
 
+    verbosity = model.verbose
     fn = model.param[1].probability == 1 ? svm_predict_probability() :
         svm_predict_values()
     for i = 1:ninstances
