@@ -1,4 +1,4 @@
-module SVM
+module LIBSVM
 
 export svmtrain, svmpredict
 
@@ -73,7 +73,7 @@ end
 let libsvm = C_NULL
     global get_libsvm
     get_libsvm() = libsvm == C_NULL ?
-        libsvm = dlopen(joinpath(Pkg.dir(), "SVM", "deps", "libsvm.so.2")) :
+        libsvm = dlopen(joinpath(Pkg.dir(), "LIBSVM", "deps", "libsvm.so.2")) :
         libsvm
 end
 
