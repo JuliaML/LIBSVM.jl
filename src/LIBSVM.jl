@@ -117,18 +117,46 @@ function grp2idx{T, S <: Real}(::Type{S}, labels::Vector,
     idx
 end
 
-function instances2nodes(instances::Array{Float64, 2})
+function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
     nodeptrs = Array(Ptr{SVMNode}, ninstances)
     nodes = Array(SVMNode, nfeatures + 1, ninstances)
 
     for i=1:ninstances
+        k = 1
         for j=1:nfeatures
-            nodes[j, i] = SVMNode(int32(j), instances[j, i])
+            if !isnan(instances[j, i])
+                nodes[k, i] = SVMNode(int32(j), float64(instances[j, i]))
+                k += 1
+            end
         end
-        nodes[nfeatures+1, i] = SVMNode(int32(-1), NaN)
+        nodes[k, i] = SVMNode(int32(-1), NaN)
         nodeptrs[i] = pointer(sub(nodes, 1, i))
+    end
+
+    (nodes, nodeptrs)
+end
+
+function instances2nodes{U<:Real}(instances::SparseMatrixCSC{U})
+    ninstances = size(instances, 2)
+    nodeptrs = Array(Ptr{SVMNode}, ninstances)
+    nodes = Array(SVMNode, nnz(instances)+ninstances)
+
+    j = 1
+    k = 1
+    for i=1:ninstances
+        nodeptrs[i] = pointer(sub(nodes, k))
+        while j < instances.colptr[i+1]
+            val = instances.nzval[j]
+            if !isnan(val)
+                nodes[k] = SVMNode(int32(instances.rowval[j]), float64(val))
+                k += 1
+            end
+            j += 1
+        end
+        nodes[k] = SVMNode(int32(-1), NaN)
+        k += 1
     end
 
     (nodes, nodeptrs)
@@ -141,7 +169,7 @@ function svmprint(str::Ptr{Uint8})
     nothing
 end
 
-function svmtrain{T}(labels::Vector{T}, instances::Array{Float64, 2};
+function svmtrain{T, U<:Real}(labels::Vector{T}, instances::AbstractMatrix{U};
     svm_type::Int=CSVC, kernel_type::Int=RBF, degree::Int=3, gamma::Float64=.00,
     coef0::Float64=0.0, C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
     cache_size=100.0::Float64, eps::Float64=0.001, shrinking::Bool=true,
@@ -201,7 +229,7 @@ end
 svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
     model.ptr)
 
-function svmpredict{T}(model::SVMModel{T}, instances::Array{Float64, 2})
+function svmpredict{T, U<:Real}(model::SVMModel{T}, instances::AbstractMatrix{U})
     global verbosity
     ninstances = size(instances, 2)
 
