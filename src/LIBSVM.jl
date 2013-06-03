@@ -101,7 +101,7 @@ end
 @cachedsym svm_predict_probability
 @cachedsym svm_free_model_content
 
-function grp2idx{T, S <: Real}(::Type{S}, labels::Vector,
+function grp2idx{T, S <: Real}(::Type{S}, labels::AbstractVector,
     label_dict::Dict{T, Int32}, reverse_labels::Vector{T})
 
     idx = Array(S, length(labels))
@@ -169,7 +169,7 @@ function svmprint(str::Ptr{Uint8})
     nothing
 end
 
-function indices_and_weights{T, U<:Real}(labels::Vector{T},
+function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
         weights::Union(Dict{T, Float64}, Nothing)=nothing)
     label_dict = Dict{T, Int32}()
@@ -195,8 +195,9 @@ function indices_and_weights{T, U<:Real}(labels::Vector{T},
     (idx, reverse_labels, weights, weight_labels)
 end
 
-function svmtrain{T, U<:Real}(labels::Vector{T}, instances::AbstractMatrix{U};
-        svm_type::Int32=CSVC, kernel_type::Int32=RBF, degree::Integer=3,
+function svmtrain{T, U<:Real}(labels::AbstractVector{T},
+        instances::AbstractMatrix{U}; svm_type::Int32=CSVC,
+        kernel_type::Int32=RBF, degree::Integer=3,
         gamma::Float64=1.0/size(instances, 1), coef0::Float64=0.0, 
         C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
         cache_size::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
@@ -209,9 +210,10 @@ function svmtrain{T, U<:Real}(labels::Vector{T}, instances::AbstractMatrix{U};
         instances, weights)
 
     param = Array(SVMParameter, 1)
-    param[1] = SVMParameter(svm_type, kernel_type, int32(degree), gamma, coef0,
-        cache_size, eps, C, int32(length(weights)), pointer(weight_labels),
-        pointer(weights), nu, p, int32(shrinking), int32(probability_estimates))
+    param[1] = SVMParameter(svm_type, kernel_type, int32(degree), float64(gamma),
+        coef0, cache_size, eps, C, int32(length(weights)),
+        pointer(weight_labels), pointer(weights), nu, p, int32(shrinking),
+        int32(probability_estimates))
 
     # Construct SVMProblem
     (nodes, nodeptrs) = instances2nodes(instances)
@@ -228,7 +230,7 @@ function svmtrain{T, U<:Real}(labels::Vector{T}, instances::AbstractMatrix{U};
     model
 end
 
-function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
+function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
         instances::AbstractMatrix{U}, nfolds::Int=5,
         C::Union(V, AbstractArray{V})=2.0.^(-5:2:15),
         gamma::Union(X, AbstractArray{X})=2.0.^(3:-2:-15);
@@ -248,8 +250,8 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
     nweights = int32(length(weights))
     shrinking = int32(shrinking)
     for i = 1:length(C), j = 1:length(gamma)
-        params[i, j] = SVMParameter(svm_type, kernel_type, degree,
-            gamma[j], coef0, cache_size, eps, C[i], nweights,
+        params[i, j] = SVMParameter(svm_type, kernel_type, int32(degree),
+            float64(gamma[j]), coef0, cache_size, eps, float64(C[i]), nweights,
             pointer(weight_labels), pointer(weights), nu, p, shrinking,
             int32(0))
     end
@@ -257,11 +259,11 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
     # Get information about classes
     (nodes, nodeptrs) = instances2nodes(instances)
     n_classes = length(reverse_labels)
-    nr_class = zeros(Int, n_classes)
+    n_class = zeros(Int, n_classes)
     for id in idx
-        nr_class[id] += 1
+        n_class[id] += 1
     end
-    by_class = [Array(Int, n) for n in nr_class]
+    by_class = [Array(Int, n) for n in n_class]
     idx_class = zeros(Int, n_classes)
     for i = 1:length(idx)
         cl = idx[i]
@@ -270,7 +272,7 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
     for i = 1:n_classes
         shuffle!(by_class[i])
     end
-    prop_class = nr_class/length(idx)
+    prop_class = n_class/length(idx)
 
     # Perform cross-validation
     decvalues = Array(Float64, length(reverse_labels))
@@ -281,7 +283,7 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
         fold_ntest = 0
         for j = 1:n_classes
             fold_classes[j] =
-                div((i-1)*nr_class[j], nfolds)+1:div(i*nr_class[j], nfolds)
+                div((i-1)*n_class[j], nfolds)+1:div(i*n_class[j], nfolds)
             fold_ntest += length(fold_classes[j])
         end
 
@@ -300,7 +302,7 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
                 fold_train[itest+1:itest+n] = class_idx[1:n]
                 itest += n
             end
-            n = nr_class[j] - last(train_range)
+            n = n_class[j] - last(train_range)
             if n > 0
                 fold_train[itest+1:itest+n] = class_idx[last(train_range)+1:end]
                 itest += n
@@ -312,7 +314,9 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::Vector{T},
         end
 
         fold_train_nodeptrs = nodeptrs[fold_train]
-        problem = SVMProblem[SVMProblem(int32(fold_ntrain), pointer(idx),
+        fold_train_labels = idx[fold_train]
+        problem = SVMProblem[SVMProblem(int32(fold_ntrain),
+            pointer(fold_train_labels),
             pointer(fold_train_nodeptrs))]
 
         for j = 1:length(params)
@@ -336,7 +340,8 @@ end
 svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
     model.ptr)
 
-function svmpredict{T, U<:Real}(model::SVMModel{T}, instances::AbstractMatrix{U})
+function svmpredict{T, U<:Real}(model::SVMModel{T},
+        instances::AbstractMatrix{U})
     global verbosity
     ninstances = size(instances, 2)
 
