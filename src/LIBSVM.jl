@@ -66,6 +66,12 @@ end
 type SVMModel{T}
     ptr::Ptr{Void}
     param::Vector{SVMParameter}
+
+    # Prevent these from being garbage collected
+    problem::Vector{SVMProblem} 
+    nodes::Array{SVMNode}
+    nodeptr::Vector{Ptr{SVMNode}}
+
     labels::Vector{T}
     weight_labels::Vector{Int32}
     weights::Vector{Float64}
@@ -224,8 +230,8 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     ptr = ccall(svm_train(), Ptr{Void}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
 
-    model = SVMModel(ptr, param, reverse_labels, weight_labels, weights,
-        size(instances, 1), verbose)
+    model = SVMModel(ptr, param, problem, nodes, nodeptrs, reverse_labels,
+        weight_labels, weights, size(instances, 1), verbose)
     finalizer(model, svmfree)
     model
 end
