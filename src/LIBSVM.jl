@@ -132,10 +132,8 @@ function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     for i=1:ninstances
         k = 1
         for j=1:nfeatures
-            if !isnan(instances[j, i])
-                nodes[k, i] = SVMNode(int32(j), float64(instances[j, i]))
-                k += 1
-            end
+            nodes[k, i] = SVMNode(int32(j), float64(instances[j, i]))
+            k += 1
         end
         nodes[k, i] = SVMNode(int32(-1), NaN)
         nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
@@ -155,10 +153,8 @@ function instances2nodes{U<:Real}(instances::SparseMatrixCSC{U})
         nodeptrs[i] = pointer(nodes, k)
         while j < instances.colptr[i+1]
             val = instances.nzval[j]
-            if !isnan(val)
-                nodes[k] = SVMNode(int32(instances.rowval[j]), float64(val))
-                k += 1
-            end
+            nodes[k] = SVMNode(int32(instances.rowval[j]), float64(val))
+            k += 1
             j += 1
         end
         nodes[k] = SVMNode(int32(-1), NaN)
