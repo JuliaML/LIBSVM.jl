@@ -1,7 +1,7 @@
-using RDatasets, LIBSVM
-iris = data("datasets", "iris")
-labels = iris["Species"].data
-instances = transpose(matrix(iris[:, 2:5]))
+using LIBSVM
+iris = readcsv(joinpath(dirname(@__FILE__), "iris.csv"))
+labels = iris[:, 5]
+instances = convert(Matrix{Float64}, iris[:, 1:4]')
 model = svmtrain(labels[1:2:end], instances[:, 1:2:end]; verbose=true)
 gc()
 (class, decvalues) = svmpredict(model, instances[:, 2:2:end])
