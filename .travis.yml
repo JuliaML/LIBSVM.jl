@@ -11,8 +11,4 @@ before_install:
     - git config --global user.name "Travis User"
     - git config --global user.email "travis@example.net"
 script:
-    - julia -e 'versioninfo(); Pkg.init()'
-    - mkdir -p ~/.julia/LIBSVM
-    - cp -R ./* ~/.julia/LIBSVM/
-    - julia ~/.julia/LIBSVM/deps/build.jl
-    - julia ~/.julia/LIBSVM/test/runtests.jl
+    - julia -e 'versioninfo(); Pkg.init(); Pkg.clone(pwd()); Pkg.build("LIBSVM"); include("test/runtests.jl")'
