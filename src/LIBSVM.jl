@@ -180,11 +180,6 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
 
 	idx = grp2idx(Float64, labels, label_dict, reverse_labels)
 
-	# Added by LD 11/14/2015 to allow for regression
-	if T == Float64
-		idx = labels
-	end
-
     if length(labels) != size(instances, 2)
         error("""Size of second dimension of training instance matrix
         ($(size(instances, 2))) does not match length of labels
@@ -216,7 +211,12 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     global verbosity
 
     (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
-        instances, weights)
+		instances, weights)
+
+	# changed by LD 11/14/2015 to allow for regression
+	if svm_type == EpsilonSVR || svm_type == NuSVR
+		idx = labels
+	end
 
     param = Array(SVMParameter, 1)
     param[1] = SVMParameter(svm_type, kernel_type, Int32(degree), Float64(gamma),
