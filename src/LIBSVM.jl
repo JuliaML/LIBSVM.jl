@@ -1,6 +1,6 @@
 module LIBSVM
 
-export svmtrain, svmpredict, svmcv
+export svmtrain, svmpredict, svmcv, save
 
 const CSVC = Int32(0)
 const NuSVC = Int32(1)
@@ -106,6 +106,7 @@ end
 @cachedsym svm_predict_values
 @cachedsym svm_predict_probability
 @cachedsym svm_free_model_content
+@cachedsym svm_save_model		# Added by LD 11/14/2015
 
 function grp2idx{T, S <: Real}(::Type{S}, labels::AbstractVector,
     label_dict::Dict{T, Int32}, reverse_labels::Vector{T})
@@ -176,7 +177,13 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
         weights::Union{Dict{T, Float64}, Void}=nothing)
     label_dict = Dict{T, Int32}()
     reverse_labels = Array(T, 0)
-    idx = grp2idx(Float64, labels, label_dict, reverse_labels)
+
+	idx = grp2idx(Float64, labels, label_dict, reverse_labels)
+
+	# Added by LD 11/14/2015 to allow for regression
+	if T == Float64
+		idx = labels
+	end
 
     if length(labels) != size(instances, 2)
         error("""Size of second dimension of training instance matrix
@@ -230,6 +237,11 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
         weight_labels, weights, size(instances, 1), verbose)
     finalizer(model, svmfree)
     model
+end
+
+# Added by LD 11/14/2015 to allow saving of model file
+function save(filename::AbstractString, model::SVMModel)
+	ccall(svm_save_model(), Int32, (Ptr{UInt8}, Ptr{Void}), filename, model.ptr)
 end
 
 function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
@@ -359,11 +371,18 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
     verbosity = model.verbose
     fn = model.param[1].probability == 1 ? svm_predict_probability() :
         svm_predict_values()
+
+	svm_type = model.param[1].svm_type
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
             model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        #class[i] = model.labels[int(output)]
-        class[i] = model.labels[round(Int, output, RoundNearestTiesAway)]
+
+		# changed by LD 11/14/2015 to allow for regression
+		if svm_type == EpsilonSVR || svm_type == NuSVR
+			class[i] = output
+		else
+			class[i] = model.labels[round(Int, output, RoundNearestTiesAway)]
+		end
     end
 
     (class, decvalues)
