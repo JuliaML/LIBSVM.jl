@@ -210,6 +210,9 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
 
     (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
         instances, weights)
+    if svm_type == OneClassSVM && length(reverse_labels) > 1
+        error("More than one class exist for OneClassSVM (svm_type = 2).")
+    end
 
     param = Array(SVMParameter, 1)
     param[1] = SVMParameter(svm_type, kernel_type, int32(degree), float64(gamma),
@@ -361,8 +364,13 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
         svm_predict_values()
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
-            model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        class[i] = model.labels[int(output)]
+        model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+        if model.param[1].svm_type == OneClassSVM
+            # one-class SVM, NaN for out-of-class instances
+            class[i] = output > 0 ? model.labels[1] : NaN
+        else
+            class[i] = model.labels[int(output)]
+        end
     end
 
     (class, decvalues)
