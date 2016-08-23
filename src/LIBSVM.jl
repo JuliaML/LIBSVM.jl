@@ -1,6 +1,6 @@
 module LIBSVM
 
-export svmtrain, svmpredict, svmcv, svmpredict!
+export svmtrain, svmpredict, svmcv, init_svmpredict, svmpredict!
 
 const CSVC = Int32(0)
 const NuSVC = Int32(1)
@@ -147,8 +147,6 @@ function instances2nodes!{U<:Real}(nodes, nodeptrs, instances::AbstractMatrix{U}
     ninstances = size(instances, 2)
     @assert size(nodes) == (nfeatures+1,ninstances)
     @assert size(nodeptrs,1) == ninstances
-    #nodeptrs = Array(Ptr{SVMNode}, size(K, 2))
-    #nodes = Array(SVMNode, size(K, 1) + 1, size(K, 2))
 
     for i=1:ninstances
         k = 1
@@ -393,8 +391,9 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
     (class, decvalues)
 end
 
-function svmpredict!{T, U<:Real}(class, decvalues, nodes, nodeptrs, model::SVMModel{T},
-        instances::AbstractMatrix{U})
+function svmpredict!{T, U<:Real}(svmpredict_out::Tuple{Array{Any,1},Array{Float64,2},Array{LIBSVM.SVMNode,2},Array{Ptr{LIBSVM.SVMNode},1}}
+                                 , model::SVMModel{T}, instances::AbstractMatrix{U})
+  (class, decvalues, nodes, nodeptrs) = svmpredict_out
   @assert size(class, 1) == size(decvalues, 2)
     global verbosity
     ninstances = size(instances, 2)
@@ -422,6 +421,17 @@ function svmpredict!{T, U<:Real}(class, decvalues, nodes, nodeptrs, model::SVMMo
     end
 
     (class, decvalues)
+end
+
+function init_svmpredict{U<:Real}(instances::AbstractMatrix{U})
+  nfeatures = size(instances, 1)
+  ninstances = size(instances, 2)
+  nodeptrs = Array(Ptr{SVMNode}, ninstances)
+  nodes = Array(SVMNode, nfeatures + 1, ninstances)
+  class = Array(Any, ninstances);
+  decvalues = Array(Float64, 1, ninstances);
+  svmpredict_out = (class, decvalues, nodes, nodeptrs)
+  return(svmpredict_out)
 end
 
 end
