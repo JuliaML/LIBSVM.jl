@@ -79,6 +79,13 @@ type SVMModel{T}
     verbose::Bool
 end
 
+type SVM_OUT
+  class::Array{Any}
+  decvalues::Array{Float64}
+  nodes::Array{SVMNode}
+  nodeptrs::Array{Ptr{SVMNode}}
+end
+
 let libsvm = C_NULL
     global get_libsvm
     function get_libsvm()
@@ -129,24 +136,21 @@ function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     nodeptrs = Array(Ptr{SVMNode}, ninstances)
     nodes = Array(SVMNode, nfeatures + 1, ninstances)
 
-    for i=1:ninstances
-        k = 1
-        for j=1:nfeatures
-            nodes[k, i] = SVMNode(Int32(j), Float64(instances[j, i]))
-            k += 1
-        end
-        nodes[k, i] = SVMNode(Int32(-1), NaN)
-        nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
-    end
+    instances2nodes!(nodes, nodeptrs, instances)
 
     (nodes, nodeptrs)
 end
 
+
 function instances2nodes!{U<:Real}(nodes, nodeptrs, instances::AbstractMatrix{U})
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
-    @assert size(nodes) == (nfeatures+1,ninstances)
-    @assert size(nodeptrs,1) == ninstances
+    if(size(nodes) != (nfeatures+1,ninstances))
+       error("size(nodes) has to be equal (size(instances, 1), size(instances, 2))")
+    end
+    if(size(nodeptrs,1) != ninstances)
+      error("size(nodeptrs,1) has to be equal size(instances, 2)")
+    end
 
     for i=1:ninstances
         k = 1
@@ -363,17 +367,17 @@ svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
 
 function svmpredict{T, U<:Real}(model::SVMModel{T},
         instances::AbstractMatrix{U})
+
+    (nodes, nodeptrs) = instances2nodes(instances)
     global verbosity
     ninstances = size(instances, 2)
+    class = Array(T, ninstances)
+    nlabels = length(model.labels)
+    decvalues = Array(Float64, nlabels, ninstances)
 
     if size(instances, 1) != model.nfeatures
         error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
     end
-
-    (nodes, nodeptrs) = instances2nodes(instances)
-    class = Array(T, ninstances)
-    nlabels = length(model.labels)
-    decvalues = Array(Float64, nlabels, ninstances)
 
     verbosity = model.verbose
     fn = model.param[1].probability == 1 ? svm_predict_probability() :
@@ -391,10 +395,12 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
     (class, decvalues)
 end
 
-function svmpredict!{T, U<:Real}(svmpredict_out::Tuple{Array{Any,1},Array{Float64,2},Array{LIBSVM.SVMNode,2},Array{Ptr{LIBSVM.SVMNode},1}}
+function svmpredict!{T, U<:Real}(svmpredict_out::SVM_OUT
                                  , model::SVMModel{T}, instances::AbstractMatrix{U})
-  (class, decvalues, nodes, nodeptrs) = svmpredict_out
-  @assert size(class, 1) == size(decvalues, 2)
+  (class, decvalues, nodes, nodeptrs) = (svmpredict_out.class, svmpredict_out.decvalues, svmpredict_out.nodes, svmpredict_out.nodeptrs)
+  if(size(class, 1) != size(decvalues, 2))
+    error("svmpredict_out provides size(class, 1) = $(size(class, 1)) but size(decvalues, 2) = $(size(decvalues, 2)). Has to be equal.")
+  end
     global verbosity
     ninstances = size(instances, 2)
 
@@ -403,9 +409,7 @@ function svmpredict!{T, U<:Real}(svmpredict_out::Tuple{Array{Any,1},Array{Float6
     end
 
     instances2nodes!(nodes, nodeptrs, instances)
-    #class = Array(T, ninstances)
     nlabels = length(model.labels)
-    #decvalues = Array(Float64, nlabels, ninstances)
 
     verbosity = model.verbose
     fn = model.param[1].probability == 1 ? svm_predict_probability() :
@@ -430,7 +434,7 @@ function init_svmpredict{U<:Real}(instances::AbstractMatrix{U})
   nodes = Array(SVMNode, nfeatures + 1, ninstances)
   class = Array(Any, ninstances);
   decvalues = Array(Float64, 1, ninstances);
-  svmpredict_out = (class, decvalues, nodes, nodeptrs)
+  svmpredict_out = SVM_OUT(class, decvalues, nodes, nodeptrs)
   return(svmpredict_out)
 end
 
