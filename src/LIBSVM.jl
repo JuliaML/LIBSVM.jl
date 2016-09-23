@@ -1,6 +1,6 @@
 module LIBSVM
 
-export svmtrain, svmpredict, svmcv
+export svmtrain, svmpredict, svmcv, init_svmpredict, svmpredict!
 
 const CSVC = Int32(0)
 const NuSVC = Int32(1)
@@ -79,13 +79,19 @@ type SVMModel{T}
     verbose::Bool
 end
 
+type SVMTemp
+  class::Array{Any}
+  decvalues::Array{Float64}
+  nodes::Array{SVMNode}
+  nodeptrs::Array{Ptr{SVMNode}}
+end
+
 let libsvm = C_NULL
     global get_libsvm
     function get_libsvm()
         if libsvm == C_NULL
             libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "LIBSVM", "deps",
                 "libsvm.so.2"))
-            # libsvm = Libdl.dlopen("/usr/local/Cellar/libsvm/3.21/lib/libsvm.2.dylib")
             ccall(Libdl.dlsym(libsvm, :svm_set_print_string_function), Void,
                 (Ptr{Void},), cfunction(svmprint, Void, (Ptr{UInt8},)))
         end
@@ -129,6 +135,22 @@ function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     ninstances = size(instances, 2)
     nodeptrs = Array(Ptr{SVMNode}, ninstances)
     nodes = Array(SVMNode, nfeatures + 1, ninstances)
+
+    instances2nodes!(nodes, nodeptrs, instances)
+
+    (nodes, nodeptrs)
+end
+
+
+function instances2nodes!{U<:Real}(nodes, nodeptrs, instances::AbstractMatrix{U})
+    nfeatures = size(instances, 1)
+    ninstances = size(instances, 2)
+    if(size(nodes) != (nfeatures+1,ninstances))
+       error("size(nodes) has to be equal (size(instances, 1), size(instances, 2))")
+    end
+    if(size(nodeptrs,1) != ninstances)
+      error("size(nodeptrs,1) has to be equal size(instances, 2)")
+    end
 
     for i=1:ninstances
         k = 1
@@ -345,6 +367,20 @@ svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
 
 function svmpredict{T, U<:Real}(model::SVMModel{T},
         instances::AbstractMatrix{U})
+
+    svmpredict_out = init_svmpredict(instances, length(model.labels))
+    svmpredict!(svmpredict_out, model, instances)
+
+    svmpredict_out.class,svmpredict_out.decvalues
+end
+
+function svmpredict!{T, U<:Real}(svmpredict_out::SVMTemp
+                                 , model::SVMModel{T}
+                                 , instances::AbstractMatrix{U})
+  (class, decvalues, nodes, nodeptrs) = (svmpredict_out.class, svmpredict_out.decvalues, svmpredict_out.nodes, svmpredict_out.nodeptrs)
+  if(size(class, 1) != size(decvalues, 2))
+    error("svmpredict_out provides size(class, 1) = $(size(class, 1)) but size(decvalues, 2) = $(size(decvalues, 2)). Has to be equal.")
+  end
     global verbosity
     ninstances = size(instances, 2)
 
@@ -352,10 +388,8 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
         error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
     end
 
-    (nodes, nodeptrs) = instances2nodes(instances)
-    class = Array(T, ninstances)
+    instances2nodes!(nodes, nodeptrs, instances)
     nlabels = length(model.labels)
-    decvalues = Array(Float64, nlabels, ninstances)
 
     verbosity = model.verbose
     fn = model.param[1].probability == 1 ? svm_predict_probability() :
@@ -363,9 +397,36 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
             model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        class[i] = model.labels[round(Int,output)]
+        if model.param[1].svm_type==Int32(2) # if one class SVM
+          class[i]=output
+        else
+          class[i] = model.labels[round(Int, output)]
+        end
     end
 
-    (class, decvalues)
+    class, decvalues
 end
+
+function init_svmpredict{U<:Real}(instances::AbstractMatrix{U}, nlabels)
+  nfeatures = size(instances, 1)
+  ninstances = size(instances, 2)
+  nodeptrs = Array(Ptr{SVMNode}, ninstances)
+  nodes = Array(SVMNode, nfeatures + 1, ninstances)
+  class = Array(Any, ninstances);
+  decvalues = Array(Float64, nlabels, ninstances);
+  svmpredict_out = SVMTemp(class, decvalues, nodes, nodeptrs)
+  return(svmpredict_out)
+end
+
+function init_svmpredict{U<:Real}(instances::AbstractMatrix{U}, model::SVMModel)
+  nfeatures = size(instances, 1)
+  ninstances = size(instances, 2)
+  nodeptrs = Array(Ptr{SVMNode}, ninstances)
+  nodes = Array(SVMNode, nfeatures + 1, ninstances)
+  class = Array(Any, ninstances);
+  decvalues = Array(Float64, length(model.labels), ninstances);
+  svmpredict_out = SVMTemp(class, decvalues, nodes, nodeptrs)
+  return(svmpredict_out)
+end
+
 end
