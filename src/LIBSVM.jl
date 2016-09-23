@@ -79,7 +79,7 @@ type SVMModel{T}
     verbose::Bool
 end
 
-type SVM_OUT
+type SVMTemp
   class::Array{Any}
   decvalues::Array{Float64}
   nodes::Array{SVMNode}
@@ -368,13 +368,13 @@ svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
 function svmpredict{T, U<:Real}(model::SVMModel{T},
         instances::AbstractMatrix{U})
 
-    svmpredict_out = init_svmpredict(instances)
+    svmpredict_out = init_svmpredict(instances, length(model.labels))
     svmpredict!(svmpredict_out, model, instances)
 
-    svmpredict_out
+    svmpredict_out.class,svmpredict_out.decvalues
 end
 
-function svmpredict!{T, U<:Real}(svmpredict_out::SVM_OUT
+function svmpredict!{T, U<:Real}(svmpredict_out::SVMTemp
                                  , model::SVMModel{T}
                                  , instances::AbstractMatrix{U})
   (class, decvalues, nodes, nodeptrs) = (svmpredict_out.class, svmpredict_out.decvalues, svmpredict_out.nodes, svmpredict_out.nodeptrs)
@@ -404,17 +404,28 @@ function svmpredict!{T, U<:Real}(svmpredict_out::SVM_OUT
         end
     end
 
-    svmpredict_out
+    class, decvalues
 end
 
-function init_svmpredict{U<:Real}(instances::AbstractMatrix{U})
+function init_svmpredict{U<:Real}(instances::AbstractMatrix{U}, nlabels)
   nfeatures = size(instances, 1)
   ninstances = size(instances, 2)
   nodeptrs = Array(Ptr{SVMNode}, ninstances)
   nodes = Array(SVMNode, nfeatures + 1, ninstances)
   class = Array(Any, ninstances);
-  decvalues = Array(Float64, 1, ninstances);
-  svmpredict_out = SVM_OUT(class, decvalues, nodes, nodeptrs)
+  decvalues = Array(Float64, nlabels, ninstances);
+  svmpredict_out = SVMTemp(class, decvalues, nodes, nodeptrs)
+  return(svmpredict_out)
+end
+
+function init_svmpredict{U<:Real}(instances::AbstractMatrix{U}, model::SVMModel)
+  nfeatures = size(instances, 1)
+  ninstances = size(instances, 2)
+  nodeptrs = Array(Ptr{SVMNode}, ninstances)
+  nodes = Array(SVMNode, nfeatures + 1, ninstances)
+  class = Array(Any, ninstances);
+  decvalues = Array(Float64, length(model.labels), ninstances);
+  svmpredict_out = SVMTemp(class, decvalues, nodes, nodeptrs)
   return(svmpredict_out)
 end
 
