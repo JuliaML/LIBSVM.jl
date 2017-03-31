@@ -264,12 +264,12 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
     n_classes = length(reverse_labels)
     n_class = zeros(Int, n_classes)
     for id in idx
-        n_class[id] += 1
+        n_class[Int64(id)] += 1
     end
     by_class = [Array(Int, n) for n in n_class]
     idx_class = zeros(Int, n_classes)
     for i = 1:length(idx)
-        cl = idx[i]
+        cl = Int64(idx[i])
         by_class[cl][(idx_class[cl] += 1)] = i
     end
     for i = 1:n_classes
@@ -279,7 +279,7 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
 
     # Perform cross-validation
     decvalues = Array(Float64, length(reverse_labels))
-    fold_classes = Array(Range1{Int}, n_classes)
+    fold_classes = Array(UnitRange{Int}, n_classes)
     perf = zeros(Float64, length(C), length(gamma))
     for i = 1:nfolds
         # Get range for test for each class
