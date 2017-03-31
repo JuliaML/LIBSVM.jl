@@ -167,7 +167,7 @@ end
 
 function svmprint(str::Ptr{UInt8})
     if verbosity::Bool
-        print(bytestring(str))
+        print(unsafe_string(str))
     end
     nothing
 end
