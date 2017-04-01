@@ -111,7 +111,7 @@ end
 function grp2idx{T, S <: Real}(::Type{S}, labels::AbstractVector,
     label_dict::Dict{T, Int32}, reverse_labels::Vector{T})
 
-    idx = Array(S, length(labels))
+    idx = Array{S}(length(labels))
     nextkey = length(reverse_labels) + 1
     for i = 1:length(labels)
         key = labels[i]
@@ -127,8 +127,8 @@ end
 function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
-    nodeptrs = Array(Ptr{SVMNode}, ninstances)
-    nodes = Array(SVMNode, nfeatures + 1, ninstances)
+    nodeptrs = Array{Ptr{SVMNode}}(ninstances)
+    nodes = Array{SVMNode}(nfeatures + 1, ninstances)
 
     for i=1:ninstances
         k = 1
@@ -145,8 +145,8 @@ end
 
 function instances2nodes{U<:Real}(instances::SparseMatrixCSC{U})
     ninstances = size(instances, 2)
-    nodeptrs = Array(Ptr{SVMNode}, ninstances)
-    nodes = Array(SVMNode, nnz(instances)+ninstances)
+    nodeptrs = Array{Ptr{SVMNode}}(ninstances)
+    nodes = Array{SVMNode}(nnz(instances)+ninstances)
 
     j = 1
     k = 1
@@ -176,7 +176,7 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
         weights::Union{Dict{T, Float64}, Void}=nothing)
     label_dict = Dict{T, Int32}()
-    reverse_labels = Array(T, 0)
+    reverse_labels = Array{T}(0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
 
     if length(labels) != size(instances, 2)
@@ -212,7 +212,7 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
         instances, weights)
 
-    param = Array(SVMParameter, 1)
+    param = Array{SVMParameter}(1)
     param[1] = SVMParameter(svm_type, kernel_type, Int32(degree), Float64(gamma),
         coef0, cache_size, eps, C, Int32(length(weights)),
         pointer(weight_labels), pointer(weights), nu, p, Int32(shrinking),
@@ -353,9 +353,9 @@ function svmpredict{T, U<:Real}(model::SVMModel{T},
     end
 
     (nodes, nodeptrs) = instances2nodes(instances)
-    class = Array(T, ninstances)
+    class = Array{T}(ninstances)
     nlabels = length(model.labels)
-    decvalues = Array(Float64, nlabels, ninstances)
+    decvalues = Array{Float64}(nlabels, ninstances)
 
     verbosity = model.verbose
     fn = model.param[1].probability == 1 ? svm_predict_probability() :
