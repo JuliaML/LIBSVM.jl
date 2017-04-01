@@ -190,9 +190,9 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
         weight_labels = Int32[]
         weights = Float64[]
     else
-        weight_labels = grp2idx(Int32, keys(weights), label_dict,
+        weight_labels = grp2idx(Int32, collect(keys(weights)), label_dict,
             reverse_labels)
-        weights = Float64(values(weights))
+        weights = collect(values(weights))
     end
 
     (idx, reverse_labels, weights, weight_labels)
