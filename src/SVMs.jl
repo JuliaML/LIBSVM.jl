@@ -70,8 +70,6 @@ end
 
 function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
     svs = SupportVectors(smc, y, X)
-    println(svs)
-
     coefs = zeros(smc.l, smc.nr_class-1)
     for k in 1:(smc.nr_class-1)
         unsafe_copy!(pointer(coefs, (k-1)*smc.l +1 ), unsafe_load(smc.sv_coef, k), smc.l)
@@ -82,8 +80,8 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
     unsafe_copy!(pointer(rho), smc.rho, rs)
 
     if svmtype !== :EpsilonSVR && svmtype !== :NuSVR
-        unsafe_copy!(pointer(libsvmlabel), smc.label, k)
         libsvmlabel = Vector{Int32}(k)
+        unsafe_copy!(pointer(libsvmlabel), smc.label, k)
     else
         libsvmlabel = Vector{Int32}(0)
     end
