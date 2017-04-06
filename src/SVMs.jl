@@ -42,13 +42,13 @@ function SupportVectors(smc::SVMModel, y, X)
                         sv_indices, nodes)
 end
 
-immutable SVM
+immutable SVM{T}
     SVMtype::Symbol
     kernel::Symbol
-    weights::Union{Dict{Any, Float64}, Void}
+    weights::Union{Dict{T, Float64}, Void}
     nfeatures::Int
-    nclasses::Int
-    labels::Vector{Any}
+    nclasses::Int32
+    labels::Vector{T}
     libsvmlabel::Vector{Int32}
     libsvmweight::Vector{Float64}
     libsvmweightlabel::Vector{Int32}
@@ -68,7 +68,7 @@ immutable SVM
     probability::Bool
 end
 
-function SVM(smc::SVMModel, y, X, weights, labels)
+function SVM{T}(smc::SVMModel, y::T, X, weights, labels)
     svs = SupportVectors(smc, y, X)
     println(svs)
     svmtype = :CSVC
@@ -475,6 +475,36 @@ svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
 #
 #     (class, decvalues)
 # end
+
+
+function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
+    global verbosity
+
+    if size(instances,1) != model.nfeatures
+        error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
+    end
+
+    ninstances = size(instances, 2)
+    (nodes, nodeptrs) = instances2nodes(instances)
+
+    class = Array{T}(ninstances)
+    nlabels = model.nclasses
+    decvalues = Array{Float64}(nlabels, ninstances)
+
+    verbosity = false
+    fn = model.probability ? svm_predict_probability() : svm_predict_values()
+
+    cmod, data = svmmodel(model)
+    ma = [cmod]
+    for i = 1:ninstances
+        output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
+            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+        class[i] = model.labels[round(Int,output)]
+    end
+
+    (class, decvalues)
+end
+
 
 function svmpredict2{U<:Real}(model::SVMModel,
         instances::AbstractMatrix{U})
