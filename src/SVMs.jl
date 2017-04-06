@@ -68,11 +68,9 @@ immutable SVM{T}
     probability::Bool
 end
 
-function SVM{T}(smc::SVMModel, y::T, X, weights, labels)
+function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
     svs = SupportVectors(smc, y, X)
     println(svs)
-    svmtype = :CSVC
-    kernel = :RBF
 
     coefs = zeros(smc.l, smc.nr_class-1)
     for k in 1:(smc.nr_class-1)
@@ -332,7 +330,8 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     verbosity = verbose
     mod = ccall(svm_train(), Ptr{SVMModel}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
-    svm = SVM(unsafe_load(mod), labels, instances, wts, reverse_labels)
+    svm = SVM(unsafe_load(mod), labels, instances, wts, reverse_labels,
+        svm_type, kernel_type)
 
     ccall(svm_free_model_content(), Void, (Ptr{Void},), mod)
     return (svm)
@@ -447,36 +446,6 @@ function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
     (C[best[1]], gamma[best[2]], perf/nfolds)
 end
 
-svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
-    model.ptr)
-
-# function svmpredict{T, U<:Real}(model::SVMModel{T},
-#         instances::AbstractMatrix{U})
-#     global verbosity
-#     ninstances = size(instances, 2)
-#
-#     if size(instances, 1) != model.nfeatures
-#         error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
-#     end
-#
-#     (nodes, nodeptrs) = instances2nodes(instances)
-#     class = Array{T}(ninstances)
-#     nlabels = length(model.labels)
-#     decvalues = Array{Float64}(nlabels, ninstances)
-#
-#     verbosity = model.verbose
-#     fn = model.param[1].probability == 1 ? svm_predict_probability() :
-#         svm_predict_values()
-#     for i = 1:ninstances
-#         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
-#             model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-#         class[i] = model.labels[round(Int,output)]
-#     end
-#
-#     (class, decvalues)
-# end
-
-
 function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
     global verbosity
 
@@ -504,7 +473,6 @@ function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
 
     (class, decvalues)
 end
-
 
 function svmpredict2{U<:Real}(model::SVMModel,
         instances::AbstractMatrix{U})
