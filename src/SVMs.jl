@@ -80,8 +80,13 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
     rs = Int(k*(k-1)/2)
     rho = Vector{Float64}(rs)
     unsafe_copy!(pointer(rho), smc.rho, rs)
-    libsvmlabel = Vector{Int32}(k)
-    unsafe_copy!(pointer(libsvmlabel), smc.label, k)
+
+    if svmtype !== :EpsilonSVR && svmtype !== :NuSVR
+        unsafe_copy!(pointer(libsvmlabel), smc.label, k)
+        libsvmlabel = Vector{Int32}(k)
+    else
+        libsvmlabel = Vector{Int32}(0)
+    end
 
     #Weights
     nw = smc.param.nr_weight
@@ -242,6 +247,7 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
     reverse_labels = Array{T}(0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
 
+
     if length(labels) != size(instances, 2)
         error("""Size of second dimension of training instance matrix
         ($(size(instances, 2))) does not match length of labels
@@ -313,8 +319,15 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     kernel = KERNELS[kernel_type]
     wts = weights
 
-    (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
-        instances, weights)
+    if svm_type == :EpsilonSVR || svm_type == :NuSVR
+        idx = labels
+        weight_labels = Int32[]
+        weights = Float64[]
+        reverse_labels = []
+    else
+        (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
+            instances, weights)
+    end
 
     param = Array{SVMParameter}(1)
     param[1] = SVMParameter(svm_tp, kernel, Int32(degree), Float64(gamma),
@@ -456,7 +469,7 @@ function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
     ninstances = size(instances, 2)
     (nodes, nodeptrs) = instances2nodes(instances)
 
-    class = Array{T}(ninstances)
+    pred = Array{T}(ninstances)
     nlabels = model.nclasses
     decvalues = Array{Float64}(nlabels, ninstances)
 
@@ -468,10 +481,14 @@ function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
             ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        class[i] = model.labels[round(Int,output)]
+        if model.SVMtype == :EpsilonSVR || model.SVMtype == :NuSVR
+            pred[i] = output
+        else
+            pred[i] = model.labels[round(Int,output)]
+        end
     end
 
-    (class, decvalues)
+    (pred, decvalues)
 end
 
 function svmpredict2{U<:Real}(model::SVMModel,
