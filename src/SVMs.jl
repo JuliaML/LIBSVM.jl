@@ -1,89 +1,154 @@
-module LIBSVM
+module SVMs
 
-export svmtrain, svmpredict, svmcv
+export svmtrain, svmpredict, svmcv, SVM, SupportVectors
 
-const CSVC = Int32(0)
-const NuSVC = Int32(1)
-const OneClassSVM = Int32(2)
-const EpsilonSVR = Int32(3)
-const NuSVR = Int32(4)
+include("LibSVMtypes.jl")
 
-const Linear = Int32(0)
-const Polynomial = Int32(1)
-const RBF = Int32(2)
-const Sigmoid = Int32(3)
-const Precomputed = Int32(4)
+const SVMS = Dict{Symbol, Int32}(
+    :CSVC => Int32(0),
+    :NuSVC => Int32(1),
+    :OneClassSVM => Int32(2),
+    :EpsilonSVR => Int32(3),
+    :NuSVR => Int32(4)
+    )
+
+const KERNELS = Dict{Symbol, Int32}(
+    :Linear => Int32(0),
+    :Polynomial => Int32(1),
+    :RBF => Int32(2),
+    :Sigmoid => Int32(3),
+    :Precomputed => Int32(4)
+    )
 
 verbosity = false
 
-immutable SVMNode
-    index::Int32
-    value::Float64
-end
-
-immutable SVMProblem
+immutable SupportVectors{T}
     l::Int32
-    y::Ptr{Float64}
-    x::Ptr{Ptr{SVMNode}}
+    nSV::Vector{Int32}
+    y::Vector{T}
+    X::Array{Float64,2}
+    indices::Vector{Int32}
+    SVnodes::Vector{SVMNode}
 end
 
-immutable SVMParameter
-    svm_type::Int32
-    kernel_type::Int32
+function SupportVectors(smc::SVMModel, y, X)
+    println(smc.l)
+    sv_indices = Array{Int32}(smc.l)
+    unsafe_copy!(pointer(sv_indices), smc.sv_indices, smc.l)
+    nodes = [unsafe_load(unsafe_load(smc.SV, i)) for i in 1:smc.l]
+    nSV = Array{Int32}(smc.nr_class)
+    unsafe_copy!(pointer(nSV), smc.sv_indices, smc.nr_class)
+    SupportVectors(smc.l, nSV, y[sv_indices], X[:,sv_indices],
+                        sv_indices, nodes)
+end
+
+immutable SVM
+    SVMtype::Symbol
+    kernel::Symbol
+    weights::Union{Dict{Any, Float64}, Void}
+    nfeatures::Int
+    nclasses::Int
+    labels::Vector{Any}
+    libsvmlabel::Vector{Int32}
+    libsvmweight::Vector{Float64}
+    libsvmweightlabel::Vector{Int32}
+    SVs::SupportVectors
+    coef0::Float64
+    coefs::Array{Float64,2}
+
+    rho::Vector{Float64}
     degree::Int32
     gamma::Float64
-    coef0::Float64
-
     cache_size::Float64
     eps::Float64
     C::Float64
-    nr_weight::Int32
-    weight_label::Ptr{Int32}
-    weight::Ptr{Float64}
     nu::Float64
     p::Float64
-    shrinking::Int32
-    probability::Int32
+    shrinking::Bool
+    probability::Bool
 end
 
-# immutable SVMModel
-#   param::SVMParameter
-#   nr_class::Int32
-#   l::Int32
-#   SV::Ptr{Ptr{SVMNode}}
-#   sv_coef::Ptr{Ptr{Float64}}
-#   rho::Ptr{Float64}
-#   probA::Ptr{Float64}
-#   probB::Ptr{Float64}
-#   sv_indices::Ptr{Int32}
+function SVM(smc::SVMModel, y, X, weights, labels)
+    svs = SupportVectors(smc, y, X)
+    println(svs)
+    svmtype = :CSVC
+    kernel = :RBF
 
-#   label::Ptr{Int32}
-#   nSV::Ptr{Int32}
+    coefs = zeros(smc.l, smc.nr_class-1)
+    for k in 1:(smc.nr_class-1)
+        unsafe_copy!(pointer(coefs, (k-1)*smc.l +1 ), unsafe_load(smc.sv_coef, k), smc.l)
+    end
+    k = smc.nr_class
+    rs = Int(k*(k-1)/2)
+    rho = Vector{Float64}(rs)
+    unsafe_copy!(pointer(rho), smc.rho, rs)
+    libsvmlabel = Vector{Int32}(k)
+    unsafe_copy!(pointer(libsvmlabel), smc.label, k)
 
-#   free_sv::Int32
-# end
+    #Weights
+    nw = smc.param.nr_weight
+    libsvmweight = Array{Float64}(nw)
+    libsvmweight_label = Array{Int32}(nw)
 
-type SVMModel{T}
-    ptr::Ptr{Void}
-    param::Vector{SVMParameter}
+    if nw > 0
+        unsafe_copy!(pointer(libsvmweight), smc.param.weight, nw)
+        unsafe_copy!(pointer(libsvmweight_label), smc.param.weight_label, nw)
+    end
 
-    # Prevent these from being garbage collected
-    problem::Vector{SVMProblem}
+    SVM(svmtype, kernel, weights, size(X,1),
+        smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
+        svs, smc.param.coef0, coefs, rho, smc.param.degree,
+        smc.param.gamma, smc.param.cache_size, smc.param.eps,
+        smc.param.C, smc.param.nu, smc.param.p, Bool(smc.param.shrinking),
+        Bool(smc.param.probability))
+end
+
+#Keep data for SVMModel to prevent GC
+immutable SVMData
+    probA::Vector{Float64}
+    probB::Vector{Float64}
+    coefs::Vector{Ptr{Float64}}
     nodes::Array{SVMNode}
-    nodeptr::Vector{Ptr{SVMNode}}
-
-    labels::Vector{T}
-    weight_labels::Vector{Int32}
-    weights::Vector{Float64}
-    nfeatures::Int
-    verbose::Bool
+    nodeptrs::Array{Ptr{SVMNode}}
 end
+
+"""Convert SVM model to libsvm struct for prediction"""
+function svmmodel(mod::SVM)
+    svm_type = SVMS[mod.SVMtype]
+    kernel = KERNELS[mod.kernel]
+
+    param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
+                        mod.coef0, mod.cache_size, mod.eps, mod.C,
+                        length(mod.libsvmweight), pointer(mod.libsvmweightlabel), pointer(mod.libsvmweight),
+                        mod.nu, mod.p, Int32(mod.shrinking), Int32(mod.probability))
+
+    n,m = size(mod.coefs)
+    sv_coef = Vector{Ptr{Float64}}(m)
+    for i in 1:m
+        sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
+    end
+
+    #sv_coef = [pointer(coefs), pointer(coefs,31)]
+
+    probA = Float64[]
+    probB = Float64[]
+    nodes, ptrs = SVMs.instances2nodes(mod.SVs.X)
+    data = SVMData(probA, probB, sv_coef, nodes, ptrs)
+
+    cmod = SVMModel(param, mod.nclasses, mod.SVs.l, pointer(data.nodeptrs), pointer(data.coefs),
+                pointer(mod.rho), pointer(data.probA), pointer(data.probB), pointer(mod.SVs.indices),
+                pointer(mod.libsvmlabel),
+                pointer(mod.SVs.nSV), Int32(1))
+
+    return cmod, data
+end
+
 
 let libsvm = C_NULL
     global get_libsvm
     function get_libsvm()
         if libsvm == C_NULL
-            libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "LIBSVM", "deps",
+            libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "SVMs", "deps",
                 "libsvm.so.2"))
             # libsvm = Libdl.dlopen("/usr/local/Cellar/libsvm/3.21/lib/libsvm.2.dylib")
             ccall(Libdl.dlsym(libsvm, :svm_set_print_string_function), Void,
@@ -198,7 +263,8 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
     (idx, reverse_labels, weights, weight_labels)
 end
 
-function svmtrain{T, U<:Real}(labels::AbstractVector{T},
+#Old LIBSVM
+function _svmtrain{T, U<:Real}(labels::AbstractVector{T},
         instances::AbstractMatrix{U}; svm_type::Int32=CSVC,
         kernel_type::Int32=RBF, degree::Integer=3,
         gamma::Float64=1.0/size(instances, 1), coef0::Float64=0.0,
@@ -232,6 +298,47 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     finalizer(model, svmfree)
     model
 end
+
+function svmtrain{T, U<:Real}(labels::AbstractVector{T},
+        instances::AbstractMatrix{U}; svm_type::Symbol=:CSVC,
+        kernel_type::Symbol=:RBF, degree::Integer=3,
+        gamma::Float64=1.0/size(instances, 1), coef0::Float64=0.0,
+        C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
+        cache_size::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
+        probability_estimates::Bool=false,
+        weights::Union{Dict{T, Float64}, Void}=nothing,
+        verbose::Bool=false)
+    global verbosity
+
+
+    svm_tp = SVMS[svm_type]
+    kernel = KERNELS[kernel_type]
+    wts = weights
+
+    (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
+        instances, weights)
+
+    param = Array{SVMParameter}(1)
+    param[1] = SVMParameter(svm_tp, kernel, Int32(degree), Float64(gamma),
+        coef0, cache_size, eps, C, Int32(length(weights)),
+        pointer(weight_labels), pointer(weights), nu, p, Int32(shrinking),
+        Int32(probability_estimates))
+
+    # Construct SVMProblem
+    (nodes, nodeptrs) = instances2nodes(instances)
+    problem = SVMProblem[SVMProblem(Int32(size(instances, 2)), pointer(idx),
+        pointer(nodeptrs))]
+
+    verbosity = verbose
+    mod = ccall(svm_train(), Ptr{SVMModel}, (Ptr{SVMProblem},
+        Ptr{SVMParameter}), problem, param)
+    svm = SVM(unsafe_load(mod), labels, instances, wts, reverse_labels)
+
+    ccall(svm_free_model_content(), Void, (Ptr{Void},), mod)
+    return (svm)
+    #return(mod, weights, weight_labels)
+end
+
 
 function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
         instances::AbstractMatrix{U}, nfolds::Int=5,
@@ -343,29 +450,56 @@ end
 svmfree(model::SVMModel) = ccall(svm_free_model_content(), Void, (Ptr{Void},),
     model.ptr)
 
-function svmpredict{T, U<:Real}(model::SVMModel{T},
+# function svmpredict{T, U<:Real}(model::SVMModel{T},
+#         instances::AbstractMatrix{U})
+#     global verbosity
+#     ninstances = size(instances, 2)
+#
+#     if size(instances, 1) != model.nfeatures
+#         error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
+#     end
+#
+#     (nodes, nodeptrs) = instances2nodes(instances)
+#     class = Array{T}(ninstances)
+#     nlabels = length(model.labels)
+#     decvalues = Array{Float64}(nlabels, ninstances)
+#
+#     verbosity = model.verbose
+#     fn = model.param[1].probability == 1 ? svm_predict_probability() :
+#         svm_predict_values()
+#     for i = 1:ninstances
+#         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
+#             model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+#         class[i] = model.labels[round(Int,output)]
+#     end
+#
+#     (class, decvalues)
+# end
+
+function svmpredict2{U<:Real}(model::SVMModel,
         instances::AbstractMatrix{U})
     global verbosity
+
     ninstances = size(instances, 2)
 
-    if size(instances, 1) != model.nfeatures
-        error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
-    end
-
     (nodes, nodeptrs) = instances2nodes(instances)
-    class = Array{T}(ninstances)
-    nlabels = length(model.labels)
+    class = Array{Int64}(ninstances)
+
+    nlabels = model.nr_class
     decvalues = Array{Float64}(nlabels, ninstances)
 
-    verbosity = model.verbose
-    fn = model.param[1].probability == 1 ? svm_predict_probability() :
+    verbosity = false
+    fn = model.param.probability == 1 ? svm_predict_probability() :
         svm_predict_values()
+    ma = [model]
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
-            model.ptr, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        class[i] = model.labels[round(Int,output)]
+            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+        #class[i] = model.labels[round(Int,output)]
+        class[i] = round(Int,output)
     end
 
     (class, decvalues)
 end
+
 end
