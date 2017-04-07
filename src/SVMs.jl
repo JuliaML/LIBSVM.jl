@@ -37,8 +37,14 @@ function SupportVectors(smc::SVMModel, y, X)
     unsafe_copy!(pointer(sv_indices), smc.sv_indices, smc.l)
     #Fix for regression!
     nodes = [unsafe_load(unsafe_load(smc.SV, i)) for i in 1:smc.l]
-    nSV = Array{Int32}(smc.nr_class)
-    unsafe_copy!(pointer(nSV), smc.nSV, smc.nr_class)
+
+    if Int32(smc.nSV) != 0
+        nSV = Array{Int32}(smc.nr_class)
+        unsafe_copy!(pointer(nSV), smc.nSV, smc.nr_class)
+    else
+        nSV = Array{Int32}(0)
+    end
+
     SupportVectors(smc.l, nSV, y[sv_indices], X[:,sv_indices],
                         sv_indices, nodes)
 end
