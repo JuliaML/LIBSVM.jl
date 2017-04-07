@@ -38,7 +38,7 @@ function SupportVectors(smc::SVMModel, y, X)
     #Fix for regression!
     nodes = [unsafe_load(unsafe_load(smc.SV, i)) for i in 1:smc.l]
 
-    if Int32(smc.nSV) != 0
+    if smc.nSV != C_NULL
         nSV = Array{Int32}(smc.nr_class)
         unsafe_copy!(pointer(nSV), smc.nSV, smc.nr_class)
     else
@@ -62,6 +62,8 @@ immutable SVM{T}
     SVs::SupportVectors
     coef0::Float64
     coefs::Array{Float64,2}
+    probA::Vector{Float64}
+    probB::Vector{Float64}
 
     rho::Vector{Float64}
     degree::Int32
@@ -93,6 +95,16 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
         libsvmlabel = Vector{Int32}(0)
     end
 
+    if smc.probA == C_NULL
+        probA = Float64[]
+        probB = Float64[]
+    else
+        probA = Vector{Float64}(rs)
+        probB = Vector{Float64}(rs)
+        unsafe_copy!(pointer(probA), smc.probA, rs)
+        unsafe_copy!(pointer(probB), smc.probB, rs)
+    end
+
     #Weights
     nw = smc.param.nr_weight
     libsvmweight = Array{Float64}(nw)
@@ -105,7 +117,8 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
 
     SVM(svmtype, kernel, weights, size(X,1),
         smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
-        svs, smc.param.coef0, coefs, rho, smc.param.degree,
+        svs, smc.param.coef0, coefs, probA, probB,
+        rho, smc.param.degree,
         smc.param.gamma, smc.param.cache_size, smc.param.eps,
         smc.param.C, smc.param.nu, smc.param.p, Bool(smc.param.shrinking),
         Bool(smc.param.probability))
@@ -113,8 +126,6 @@ end
 
 #Keep data for SVMModel to prevent GC
 immutable SVMData
-    probA::Vector{Float64}
-    probB::Vector{Float64}
     coefs::Vector{Ptr{Float64}}
     nodes::Array{SVMNode}
     nodeptrs::Array{Ptr{SVMNode}}
@@ -136,15 +147,11 @@ function svmmodel(mod::SVM)
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
 
-    #sv_coef = [pointer(coefs), pointer(coefs,31)]
-
-    probA = Float64[]
-    probB = Float64[]
     nodes, ptrs = SVMs.instances2nodes(mod.SVs.X)
-    data = SVMData(probA, probB, sv_coef, nodes, ptrs)
+    data = SVMData(sv_coef, nodes, ptrs)
 
     cmod = SVMModel(param, mod.nclasses, mod.SVs.l, pointer(data.nodeptrs), pointer(data.coefs),
-                pointer(mod.rho), pointer(data.probA), pointer(data.probB), pointer(mod.SVs.indices),
+                pointer(mod.rho), pointer(mod.probA), pointer(mod.probB), pointer(mod.SVs.indices),
                 pointer(mod.libsvmlabel),
                 pointer(mod.SVs.nSV), Int32(1))
 
