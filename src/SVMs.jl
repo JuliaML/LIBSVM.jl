@@ -22,11 +22,11 @@ const KERNELS = Dict{Symbol, Int32}(
 
 verbosity = false
 
-immutable SupportVectors{T}
+immutable SupportVectors{T, U}
     l::Int32
     nSV::Vector{Int32}
     y::Vector{T}
-    X::Array{Float64,2}
+    X::AbstractMatrix{U}
     indices::Vector{Int32}
     SVnodes::Vector{SVMNode}
 end
@@ -35,9 +35,10 @@ function SupportVectors(smc::SVMModel, y, X)
     println(smc.l)
     sv_indices = Array{Int32}(smc.l)
     unsafe_copy!(pointer(sv_indices), smc.sv_indices, smc.l)
+    #Fix for regression!
     nodes = [unsafe_load(unsafe_load(smc.SV, i)) for i in 1:smc.l]
     nSV = Array{Int32}(smc.nr_class)
-    unsafe_copy!(pointer(nSV), smc.sv_indices, smc.nr_class)
+    unsafe_copy!(pointer(nSV), smc.nSV, smc.nr_class)
     SupportVectors(smc.l, nSV, y[sv_indices], X[:,sv_indices],
                         sv_indices, nodes)
 end
@@ -267,8 +268,8 @@ end
 
 #Old LIBSVM
 function _svmtrain{T, U<:Real}(labels::AbstractVector{T},
-        instances::AbstractMatrix{U}; svm_type::Int32=CSVC,
-        kernel_type::Int32=RBF, degree::Integer=3,
+        instances::AbstractMatrix{U}; svm_type::Int32=Int32(0),
+        kernel_type::Int32=Int32(2), degree::Integer=3,
         gamma::Float64=1.0/size(instances, 1), coef0::Float64=0.0,
         C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
         cache_size::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
@@ -292,13 +293,10 @@ function _svmtrain{T, U<:Real}(labels::AbstractVector{T},
         pointer(nodeptrs))]
 
     verbosity = verbose
-    ptr = ccall(svm_train(), Ptr{Void}, (Ptr{SVMProblem},
+    ptr = ccall(svm_train(), Ptr{SVMModel}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
 
-    model = SVMModel(ptr, param, problem, nodes, nodeptrs, reverse_labels,
-        weight_labels, weights, size(instances, 1), verbose)
-    finalizer(model, svmfree)
-    model
+    return (ptr, nodes, nodeptrs)
 end
 
 function svmtrain{T, U<:Real}(labels::AbstractVector{T},
