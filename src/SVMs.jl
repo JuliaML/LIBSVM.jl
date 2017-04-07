@@ -45,7 +45,10 @@ function SupportVectors(smc::SVMModel, y, X)
         nSV = Array{Int32}(0)
     end
 
-    SupportVectors(smc.l, nSV, y[sv_indices], X[:,sv_indices],
+    yi = smc.param.svm_type == SVMS[:OneClassSVM] ? Float64[] :
+                                                    y[sv_indices]
+
+    SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
                         sv_indices, nodes)
 end
 
@@ -88,11 +91,11 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
     rho = Vector{Float64}(rs)
     unsafe_copy!(pointer(rho), smc.rho, rs)
 
-    if svmtype !== :EpsilonSVR && svmtype !== :NuSVR
+    if smc.label == C_NULL
+        libsvmlabel = Vector{Int32}(0)
+    else
         libsvmlabel = Vector{Int32}(k)
         unsafe_copy!(pointer(libsvmlabel), smc.label, k)
-    else
-        libsvmlabel = Vector{Int32}(0)
     end
 
     if smc.probA == C_NULL
@@ -332,7 +335,12 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
         idx = labels
         weight_labels = Int32[]
         weights = Float64[]
-        reverse_labels = []
+        reverse_labels = Float64[]
+    elseif svm_type == :OneClassSVM
+        idx = Float64[]
+        weight_labels = Int32[]
+        weights = Float64[]
+        reverse_labels = Bool[]
     else
         (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
             instances, weights)
@@ -487,11 +495,14 @@ function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
 
     cmod, data = svmmodel(model)
     ma = [cmod]
+
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
             ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
         if model.SVMtype == :EpsilonSVR || model.SVMtype == :NuSVR
             pred[i] = output
+        elseif model.SVMtype == :OneClassSVM
+            pred[i] = output > 0
         else
             pred[i] = model.labels[round(Int,output)]
         end
