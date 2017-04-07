@@ -6,10 +6,10 @@ include("LibSVMtypes.jl")
 
 const SVMS = Dict{Symbol, Int32}(
     :CSVC => Int32(0),
-    :NuSVC => Int32(1),
-    :OneClassSVM => Int32(2),
-    :EpsilonSVR => Int32(3),
-    :NuSVR => Int32(4)
+    :nuSVC => Int32(1),
+    :oneclassSVM => Int32(2),
+    :epsilonSVR => Int32(3),
+    :nuSVR => Int32(4)
     )
 
 const KERNELS = Dict{Symbol, Int32}(
@@ -45,7 +45,7 @@ function SupportVectors(smc::SVMModel, y, X)
         nSV = Array{Int32}(0)
     end
 
-    yi = smc.param.svm_type == SVMS[:OneClassSVM] ? Float64[] :
+    yi = smc.param.svm_type == SVMS[:oneclassSVM] ? Float64[] :
                                                     y[sv_indices]
 
     SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
@@ -331,12 +331,12 @@ function svmtrain{T, U<:Real}(labels::AbstractVector{T},
     kernel = KERNELS[kernel_type]
     wts = weights
 
-    if svm_type == :EpsilonSVR || svm_type == :NuSVR
+    if svm_type == :epsilonSVR || svm_type == :nuSVR
         idx = labels
         weight_labels = Int32[]
         weights = Float64[]
         reverse_labels = Float64[]
-    elseif svm_type == :OneClassSVM
+    elseif svm_type == :oneclassSVM
         idx = Float64[]
         weight_labels = Int32[]
         weights = Float64[]
@@ -499,9 +499,9 @@ function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
             ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        if model.SVMtype == :EpsilonSVR || model.SVMtype == :NuSVR
+        if model.SVMtype == :epsilonSVR || model.SVMtype == :nuSVR
             pred[i] = output
-        elseif model.SVMtype == :OneClassSVM
+        elseif model.SVMtype == :oneclassSVM
             pred[i] = output > 0
         else
             pred[i] = model.labels[round(Int,output)]
