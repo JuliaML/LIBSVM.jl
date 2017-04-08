@@ -166,8 +166,13 @@ let libsvm = C_NULL
     global get_libsvm
     function get_libsvm()
         if libsvm == C_NULL
-            libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "SVMs", "deps",
+            if is_windows()
+                libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "SVMs", "deps",
+                "libsvm.dll"))
+            else
+                libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "SVMs", "deps",
                 "libsvm.so.2"))
+            end
             # libsvm = Libdl.dlopen("/usr/local/Cellar/libsvm/3.21/lib/libsvm.2.dylib")
             ccall(Libdl.dlsym(libsvm, :svm_set_print_string_function), Void,
                 (Ptr{Void},), cfunction(svmprint, Void, (Ptr{UInt8},)))
