@@ -1,3 +1,4 @@
+__precompile__()
 module SVMs
 
 export svmtrain, svmpredict
@@ -392,7 +393,12 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     ninstances = size(X, 2)
     (nodes, nodeptrs) = instances2nodes(X)
 
-    pred = Array{T}(ninstances)
+    if model.SVMtype == :oneclassSVM
+        pred = BitArray(ninstances)
+    else
+        pred = Array{T}(ninstances)
+    end
+
     nlabels = model.nclasses
     decvalues = Array{Float64}(nlabels, ninstances)
 
