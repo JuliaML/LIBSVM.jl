@@ -32,7 +32,6 @@ immutable SupportVectors{T, U}
 end
 
 function SupportVectors(smc::SVMModel, y, X)
-    println(smc.l)
     sv_indices = Array{Int32}(smc.l)
     unsafe_copy!(pointer(sv_indices), smc.sv_indices, smc.l)
     nodes = [unsafe_load(unsafe_load(smc.SV, i)) for i in 1:smc.l]
