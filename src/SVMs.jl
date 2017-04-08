@@ -340,7 +340,7 @@ function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
     wts = weights
 
     if svmtype == :epsilonSVR || svmtype == :nuSVR
-        idx = labels
+        idx = y
         weight_labels = Int32[]
         weights = Float64[]
         reverse_labels = Float64[]
