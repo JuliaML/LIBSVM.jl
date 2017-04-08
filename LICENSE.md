@@ -1,4 +1,7 @@
-Copyright (c) 2013 Simon Kornblith
+
+Copyright (c) 2017 Matti Pastell
+
+Copyright (c) 2013-2016 Simon Kornblith
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

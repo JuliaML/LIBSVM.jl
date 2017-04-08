@@ -1,9 +1,12 @@
-LIBSVM.jl
-=========
+# SVMs.jl
 
-[![Build Status](https://travis-ci.org/simonster/LIBSVM.jl.png?branch=master)](https://travis-ci.org/simonster/LIBSVM.jl)
+This us a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
 
-Julia bindings for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/)
+Features:
+* Supports all LIBSVM models: classification C-SVC, nu-SVC, regression: epsilon-SVR, nu-SVR
+    and distribution estimation: one-class SVM
+* Model objects are represented by Julia type SVM which gives you easy
+  access to model features and can be saved e.g. as JLD file
 
 ## Usage
 
@@ -32,6 +35,7 @@ model = svmtrain(labels[1:2:end], instances[:, 1:2:end]);
 
 ## Credits
 
-Created by Simon Kornblith
+The library is developed and maintained by Matti Pastell. It is
+based on [LIBSVM.jl](https://github.com/simonster/LIBSVM.jl) by Simon Kornblith.
 
 [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/) by Chih-Chung Chang and Chih-Jen Lin
