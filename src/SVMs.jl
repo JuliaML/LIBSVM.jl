@@ -319,176 +319,68 @@ function _svmtrain{T, U<:Real}(labels::AbstractVector{T},
     return (ptr, nodes, nodeptrs)
 end
 
-function svmtrain{T, U<:Real}(labels::AbstractVector{T},
-        instances::AbstractMatrix{U}; svm_type::Symbol=:CSVC,
-        kernel_type::Symbol=:RBF, degree::Integer=3,
-        gamma::Float64=1.0/size(instances, 1), coef0::Float64=0.0,
+function svmtrain{T, U<:Real}(y::AbstractVector{T},
+        X::AbstractMatrix{U}; svmtype::Symbol=:CSVC,
+        kernel::Symbol=:RBF, degree::Integer=3,
+        gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
         C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
-        cache_size::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
-        probability_estimates::Bool=false,
+        cachesize::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
+        probability::Bool=false,
         weights::Union{Dict{T, Float64}, Void}=nothing,
         verbose::Bool=false)
     global verbosity
 
 
-    svm_tp = SVMS[svm_type]
-    kernel = KERNELS[kernel_type]
+    _svmtype = SVMS[svmtype]
+    _kernel = KERNELS[kernel]
     wts = weights
 
-    if svm_type == :epsilonSVR || svm_type == :nuSVR
+    if svmtype == :epsilonSVR || svmtype == :nuSVR
         idx = labels
         weight_labels = Int32[]
         weights = Float64[]
         reverse_labels = Float64[]
-    elseif svm_type == :oneclassSVM
+    elseif svmtype == :oneclassSVM
         idx = Float64[]
         weight_labels = Int32[]
         weights = Float64[]
         reverse_labels = Bool[]
     else
-        (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
-            instances, weights)
+        (idx, reverse_labels, weights, weight_labels) = indices_and_weights(y,
+            X, weights)
     end
 
     param = Array{SVMParameter}(1)
-    param[1] = SVMParameter(svm_tp, kernel, Int32(degree), Float64(gamma),
-        coef0, cache_size, eps, C, Int32(length(weights)),
+    param[1] = SVMParameter(_svmtype, _kernel, Int32(degree), Float64(gamma),
+        coef0, cachesize, eps, C, Int32(length(weights)),
         pointer(weight_labels), pointer(weights), nu, p, Int32(shrinking),
-        Int32(probability_estimates))
+        Int32(probability))
 
     # Construct SVMProblem
-    (nodes, nodeptrs) = instances2nodes(instances)
-    problem = SVMProblem[SVMProblem(Int32(size(instances, 2)), pointer(idx),
+    (nodes, nodeptrs) = instances2nodes(X)
+    problem = SVMProblem[SVMProblem(Int32(size(X, 2)), pointer(idx),
         pointer(nodeptrs))]
 
     verbosity = verbose
     mod = ccall(svm_train(), Ptr{SVMModel}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
-    svm = SVM(unsafe_load(mod), labels, instances, wts, reverse_labels,
-        svm_type, kernel_type)
+    svm = SVM(unsafe_load(mod), y, X, wts, reverse_labels,
+        svmtype, kernel)
 
     ccall(svm_free_model_content(), Void, (Ptr{Void},), mod)
     return (svm)
     #return(mod, weights, weight_labels)
 end
 
-
-function svmcv{T, U<:Real, V<:Real, X<:Real}(labels::AbstractVector{T},
-        instances::AbstractMatrix{U}, nfolds::Int=5,
-        C::Union{V, AbstractArray{V}}=2.0.^(-5:2:15),
-        gamma::Union{X, AbstractArray{X}}=2.0.^(3:-2:-15);
-        svm_type::Int32=CSVC, kernel_type::Int32=RBF, degree::Integer=3,
-        coef0::Float64=0.0, nu::Float64=0.5, p::Float64=0.1,
-        cache_size::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
-        weights::Union{Dict{T, Float64}, Void}=nothing,
-        verbose::Bool=false)
-    global verbosity
-    verbosity = verbose
-    (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
-        instances, weights)
-
-    # Construct SVMParameters
-    params = Array(SVMParameter, length(C), length(gamma))
-    degree = Int32(degree)
-    nweights = Int32(length(weights))
-    shrinking = Int32(shrinking)
-    for i = 1:length(C), j = 1:length(gamma)
-        params[i, j] = SVMParameter(svm_type, kernel_type, Int32(degree),
-            Float64(gamma[j]), coef0, cache_size, eps, Float64(C[i]), nweights,
-            pointer(weight_labels), pointer(weights), nu, p, shrinking,
-            Int32(0))
-    end
-
-    # Get information about classes
-    (nodes, nodeptrs) = instances2nodes(instances)
-    n_classes = length(reverse_labels)
-    n_class = zeros(Int, n_classes)
-    for id in idx
-        n_class[Int64(id)] += 1
-    end
-    by_class = [Array(Int, n) for n in n_class]
-    idx_class = zeros(Int, n_classes)
-    for i = 1:length(idx)
-        cl = Int64(idx[i])
-        by_class[cl][(idx_class[cl] += 1)] = i
-    end
-    for i = 1:n_classes
-        shuffle!(by_class[i])
-    end
-    prop_class = n_class/length(idx)
-
-    # Perform cross-validation
-    decvalues = Array(Float64, length(reverse_labels))
-    fold_classes = Array(UnitRange{Int}, n_classes)
-    perf = zeros(Float64, length(C), length(gamma))
-    for i = 1:nfolds
-        # Get range for test for each class
-        fold_ntest = 0
-        for j = 1:n_classes
-            fold_classes[j] =
-                div((i-1)*n_class[j], nfolds)+1:div(i*n_class[j], nfolds)
-            fold_ntest += length(fold_classes[j])
-        end
-
-        # Get indices of test and training instances
-        fold_ntrain = length(idx) - fold_ntest
-        fold_train = Array(Int, fold_ntrain)
-        fold_test = Array(Int, fold_ntest)
-        itrain = 0
-        itest = 0
-        for j = 1:n_classes
-            train_range = fold_classes[j]
-            class_idx = by_class[j]
-
-            n = first(train_range) - 1
-            if n > 0
-                fold_train[itest+1:itest+n] = class_idx[1:n]
-                itest += n
-            end
-            n = n_class[j] - last(train_range)
-            if n > 0
-                fold_train[itest+1:itest+n] = class_idx[last(train_range)+1:end]
-                itest += n
-            end
-
-            n = length(train_range)
-            fold_test[itrain+1:itrain+n] = class_idx[train_range]
-            itrain += n
-        end
-
-        fold_train_nodeptrs = nodeptrs[fold_train]
-        fold_train_labels = idx[fold_train]
-        problem = SVMProblem[SVMProblem(Int32(fold_ntrain),
-            pointer(fold_train_labels),
-            pointer(fold_train_nodeptrs))]
-
-        for j = 1:length(params)
-            ptr = ccall(svm_train(), Ptr{Void}, (Ptr{SVMProblem},
-                Ptr{SVMParameter}), problem, pointer(params, j))
-            correct = 0
-            for k in fold_test
-                correct += ccall(svm_predict_values(), Float64, (Ptr{Void},
-                    Ptr{SVMNode}, Ptr{Float64}), ptr, nodeptrs[k], decvalues) ==
-                    idx[k]
-            end
-            ccall(svm_free_model_content(), Void, (Ptr{Void},), ptr)
-            perf[j] += correct/fold_ntest
-        end
-    end
-
-    best = ind2sub(size(perf), indmax(perf))
-    (C[best[1]], gamma[best[2]], perf/nfolds)
-end
-
-function svmpredict{T,U<:Real}(model::SVM{T}, instances::AbstractMatrix{U})
+function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     global verbosity
 
-    if size(instances,1) != model.nfeatures
-        error("Model has $(model.nfeatures) but $(size(instances, 1)) provided")
+    if size(X,1) != model.nfeatures
+        error("Model has $(model.nfeatures) but $(size(X, 1)) provided")
     end
 
-    ninstances = size(instances, 2)
-    (nodes, nodeptrs) = instances2nodes(instances)
+    ninstances = size(X, 2)
+    (nodes, nodeptrs) = instances2nodes(X)
 
     pred = Array{T}(ninstances)
     nlabels = model.nclasses
