@@ -166,10 +166,10 @@ let libsvm = C_NULL
     function get_libsvm()
         if libsvm == C_NULL
             if is_windows()
-                libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "SVMs", "deps",
+                libsvm = Libdl.dlopen(joinpath(dirname(@__FILE__),  "../deps",
                 "libsvm.dll"))
             else
-                libsvm = Libdl.dlopen(joinpath(Pkg.dir(), "SVMs", "deps",
+                libsvm = Libdl.dlopen(joinpath(dirname(@__FILE__),  "../deps",
                 "libsvm.so.2"))
             end
             # libsvm = Libdl.dlopen("/usr/local/Cellar/libsvm/3.21/lib/libsvm.2.dylib")
