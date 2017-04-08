@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/mpastell/SVMs.jl.svg?branch=master)](https://travis-ci.org/mpastell/SVMs.jl)
 [![Coverage Status](https://coveralls.io/repos/github/mpastell/SVMs.jl/badge.svg?branch=master)](https://coveralls.io/github/mpastell/SVMs.jl?branch=master)
 
-This us a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
+This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
 
 **Features:**
 * Supports all LIBSVM models: classification C-SVC, nu-SVC, regression: epsilon-SVR, nu-SVR
