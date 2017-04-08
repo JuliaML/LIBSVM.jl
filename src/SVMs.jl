@@ -286,39 +286,6 @@ function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
     (idx, reverse_labels, weights, weight_labels)
 end
 
-#Old LIBSVM
-function _svmtrain{T, U<:Real}(labels::AbstractVector{T},
-        instances::AbstractMatrix{U}; svm_type::Int32=Int32(0),
-        kernel_type::Int32=Int32(2), degree::Integer=3,
-        gamma::Float64=1.0/size(instances, 1), coef0::Float64=0.0,
-        C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
-        cache_size::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
-        probability_estimates::Bool=false,
-        weights::Union{Dict{T, Float64}, Void}=nothing,
-        verbose::Bool=false)
-    global verbosity
-
-    (idx, reverse_labels, weights, weight_labels) = indices_and_weights(labels,
-        instances, weights)
-
-    param = Array{SVMParameter}(1)
-    param[1] = SVMParameter(svm_type, kernel_type, Int32(degree), Float64(gamma),
-        coef0, cache_size, eps, C, Int32(length(weights)),
-        pointer(weight_labels), pointer(weights), nu, p, Int32(shrinking),
-        Int32(probability_estimates))
-
-    # Construct SVMProblem
-    (nodes, nodeptrs) = instances2nodes(instances)
-    problem = SVMProblem[SVMProblem(Int32(size(instances, 2)), pointer(idx),
-        pointer(nodeptrs))]
-
-    verbosity = verbose
-    ptr = ccall(svm_train(), Ptr{SVMModel}, (Ptr{SVMProblem},
-        Ptr{SVMParameter}), problem, param)
-
-    return (ptr, nodes, nodeptrs)
-end
-
 """
 ```julia
 svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
@@ -449,32 +416,6 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     end
 
     (pred, decvalues)
-end
-
-function svmpredict2{U<:Real}(model::SVMModel,
-        instances::AbstractMatrix{U})
-    global verbosity
-
-    ninstances = size(instances, 2)
-
-    (nodes, nodeptrs) = instances2nodes(instances)
-    class = Array{Int64}(ninstances)
-
-    nlabels = model.nr_class
-    decvalues = Array{Float64}(nlabels, ninstances)
-
-    verbosity = false
-    fn = model.param.probability == 1 ? svm_predict_probability() :
-        svm_predict_values()
-    ma = [model]
-    for i = 1:ninstances
-        output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
-            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        #class[i] = model.labels[round(Int,output)]
-        class[i] = round(Int,output)
-    end
-
-    (class, decvalues)
 end
 
 end
