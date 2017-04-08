@@ -1,6 +1,6 @@
 module SVMs
 
-export svmtrain, svmpredict, svmcv, SVM, SupportVectors
+export svmtrain, svmpredict
 
 include("LibSVMtypes.jl")
 
@@ -13,11 +13,11 @@ const SVMS = Dict{Symbol, Int32}(
     )
 
 const KERNELS = Dict{Symbol, Int32}(
-    :Linear => Int32(0),
-    :Polynomial => Int32(1),
+    :linear => Int32(0),
+    :polynomial => Int32(1),
     :RBF => Int32(2),
-    :Sigmoid => Int32(3),
-    :Precomputed => Int32(4)
+    :sigmoid => Int32(3),
+    :precomputed => Int32(4)
     )
 
 verbosity = false
@@ -71,10 +71,10 @@ immutable SVM{T}
     degree::Int32
     gamma::Float64
     cache_size::Float64
-    eps::Float64
+    tolerance::Float64
     C::Float64
     nu::Float64
-    p::Float64
+    epsilon::Float64
     shrinking::Bool
     probability::Bool
 end
@@ -139,9 +139,9 @@ function svmmodel(mod::SVM)
     kernel = KERNELS[mod.kernel]
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
-                        mod.coef0, mod.cache_size, mod.eps, mod.C,
+                        mod.coef0, mod.cache_size, mod.tolerance, mod.C,
                         length(mod.libsvmweight), pointer(mod.libsvmweightlabel), pointer(mod.libsvmweight),
-                        mod.nu, mod.p, Int32(mod.shrinking), Int32(mod.probability))
+                        mod.nu, mod.epsilon, Int32(mod.shrinking), Int32(mod.probability))
 
     n,m = size(mod.coefs)
     sv_coef = Vector{Ptr{Float64}}(m)
@@ -319,17 +319,54 @@ function _svmtrain{T, U<:Real}(labels::AbstractVector{T},
     return (ptr, nodes, nodeptrs)
 end
 
-function svmtrain{T, U<:Real}(y::AbstractVector{T},
-        X::AbstractMatrix{U}; svmtype::Symbol=:CSVC,
+"""
+```julia
+svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
+    svmtype::Symbol=:CSVC, kernel::Symbol=:RBF, degree::Integer=3,
+    gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
+    cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
+    tolerance::Float64=0.001, shrinking::Bool=true,
+    probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
+    cachesize::Float64=200.0, verbose::Bool=false)
+```
+Train Support Vector Machine using LIBSVM using response vector `y`
+and training data `X`. The shape of `X` needs to be (nsamples, nfeatures).
+For one-class SVM use only `X`.
+
+# Arguments
+
+* `svmtype::Symbol=:CSVC`: Type of SVM to train `:CSVC`, `:nuSVC`
+    `:oneclassSVM`, `:epsilonSVR` or `:nuSVR`. Defaults to `:oneclassSVM` if
+    `y` is not used.
+* `kernel::Symbol=:RBF`: Model kernel `:linear`, `:polynomial`, `:RBF`,
+    `:sigmoid` or `:precomputed`.
+* `degree::Integer=3`: Kernel degree. Used for polynomial kernel
+* `gamma::Float64=1.0/size(X, 1)` : γ for kernels
+* `coef0::Float64=0.0`: parameter for sigmoid and polynomial kernel
+* `cost::Float64=1.0`: cost parameter C of C-SVC, epsilon-SVR, and nu-SVR
+* `nu::Float64=0.5`: parameter nu of nu-SVC, one-class SVM, and nu-SVR
+* `epsilon::Float64=0.1`: epsilon in loss function of epsilon-SVR
+* `tolerance::Float64=0.001`: tolerance of termination criterion
+* `shrinking::Bool=true`: whether to use the shrinking heuristics
+* `probability::Bool=false`: whether to train a SVC or SVR model for probability estimates
+* `weights::Union{Dict{T, Float64}, Void}=nothing`: dictionary of class weights
+* `cachesize::Float64=100.0`: cache memory size in MB
+* `verbose::Bool=false`: print training output from LIBSVM if true
+
+Consult LIBSVM documentation for advice on the choise of correct
+parameters and model tuning.
+"""
+function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
+        svmtype::Symbol=:CSVC,
         kernel::Symbol=:RBF, degree::Integer=3,
         gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
-        C::Float64=1.0, nu::Float64=0.5, p::Float64=0.1,
-        cachesize::Float64=100.0, eps::Float64=0.001, shrinking::Bool=true,
-        probability::Bool=false,
-        weights::Union{Dict{T, Float64}, Void}=nothing,
-        verbose::Bool=false)
+        cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
+        tolerance::Float64=0.001, shrinking::Bool=true,
+        probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
+        cachesize::Float64=200.0, verbose::Bool=false)
     global verbosity
 
+    isempty(y) && (svmtype = :oneclassSVM)
 
     _svmtype = SVMS[svmtype]
     _kernel = KERNELS[kernel]
@@ -352,8 +389,8 @@ function svmtrain{T, U<:Real}(y::AbstractVector{T},
 
     param = Array{SVMParameter}(1)
     param[1] = SVMParameter(_svmtype, _kernel, Int32(degree), Float64(gamma),
-        coef0, cachesize, eps, C, Int32(length(weights)),
-        pointer(weight_labels), pointer(weights), nu, p, Int32(shrinking),
+        coef0, cachesize, tolerance, cost, Int32(length(weights)),
+        pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
         Int32(probability))
 
     # Construct SVMProblem
@@ -372,6 +409,13 @@ function svmtrain{T, U<:Real}(y::AbstractVector{T},
     #return(mod, weights, weight_labels)
 end
 
+"""
+`svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})`
+
+Predict values using `model` based on data `X`. The shape of `X`
+needs to be (nsamples, nfeatures). The method returns tuple
+(predictions, decisionvalues).
+"""
 function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     global verbosity
 
