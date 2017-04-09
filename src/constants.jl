@@ -29,6 +29,14 @@ const SOLVERS = Dict{Type, Int32}(
 )
 end
 
+const KERNELS = Dict{Symbol, Int32}(
+    :linear => Int32(0),
+    :polynomial => Int32(1),
+    :RBF => Int32(2),
+    :sigmoid => Int32(3),
+    :precomputed => Int32(4)
+    )
+
 const SVMS = Dict{Symbol, Int32}(
     :CSVC => Int32(0),
     :nuSVC => Int32(1),
@@ -37,10 +45,6 @@ const SVMS = Dict{Symbol, Int32}(
     :nuSVR => Int32(4)
     )
 
-const KERNELS = Dict{Symbol, Int32}(
-    :linear => Int32(0),
-    :polynomial => Int32(1),
-    :RBF => Int32(2),
-    :sigmoid => Int32(3),
-    :precomputed => Int32(4)
-    )
+module Kernel
+@enum KERNEL Linear Polynomial RadialBasis Sigmoid Precomputed
+end

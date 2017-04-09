@@ -5,7 +5,7 @@ import ScikitLearnBase: BaseClassifier, BaseRegressor
 @compat abstract type AbstractSVR<:BaseRegressor end
 
 type SVC<:AbstractSVC
-    kernel::Symbol
+    kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     weights::Union{Dict, Void}
     cost::Float64
@@ -20,7 +20,7 @@ type SVC<:AbstractSVC
 end
 
 type NuSVC<:AbstractSVC
-    kernel::Symbol
+    kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     weights::Union{Dict, Void}
     nu::Float64
@@ -35,7 +35,7 @@ type NuSVC<:AbstractSVC
 end
 
 type OneClassSVM<:AbstractSVC
-    kernel::Symbol
+    kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     nu::Float64
     cost::Float64
@@ -49,7 +49,7 @@ type OneClassSVM<:AbstractSVC
 end
 
 type NuSVR<:AbstractSVR
-    kernel::Symbol
+    kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     nu::Float64
     cost::Float64
@@ -63,7 +63,7 @@ type NuSVR<:AbstractSVR
 end
 
 type EpsilonSVR<:AbstractSVR
-    kernel::Symbol
+    kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     epsilon::Float64
     cost::Float64

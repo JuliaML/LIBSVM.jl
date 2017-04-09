@@ -41,7 +41,7 @@ end
 
 immutable SVM{T}
     SVMtype::Symbol
-    kernel::Symbol
+    kernel::Kernel.KERNEL
     weights::Union{Dict{T, Float64}, Void}
     nfeatures::Int
     nclasses::Int32
@@ -124,7 +124,7 @@ end
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
     svm_type = SVMS[mod.SVMtype]
-    kernel = KERNELS[mod.kernel]
+    kernel = Int32(mod.kernel)
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
                         mod.coef0, mod.cache_size, mod.tolerance, mod.cost,
@@ -277,7 +277,7 @@ end
 """
 ```julia
 svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
-    svmtype::Symbol=:CSVC, kernel::Symbol=:RBF, degree::Integer=3,
+    svmtype::Symbol=:CSVC, kernel::Kernel.KERNEL=Kernel.RadialBasis, degree::Integer=3,
     gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
     cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
     tolerance::Float64=0.001, shrinking::Bool=true,
@@ -293,8 +293,8 @@ For one-class SVM use only `X`.
 * `svmtype::Symbol=:CSVC`: Type of SVM to train `:CSVC`, `:nuSVC`
     `:oneclassSVM`, `:epsilonSVR` or `:nuSVR`. Defaults to `:oneclassSVM` if
     `y` is not used.
-* `kernel::Symbol=:RBF`: Model kernel `:linear`, `:polynomial`, `:RBF`,
-    `:sigmoid` or `:precomputed`.
+* `kernel::Kernels.KERNEL=Kernel.RadialBasis`: Model kernel `Linear`, `polynomial`,
+    `RadialBasis`, `Sigmoid` or `Precomputed`.
 * `degree::Integer=3`: Kernel degree. Used for polynomial kernel
 * `gamma::Float64=1.0/size(X, 1)` : γ for kernels
 * `coef0::Float64=0.0`: parameter for sigmoid and polynomial kernel
@@ -313,7 +313,7 @@ parameters and model tuning.
 """
 function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         svmtype::Symbol=:CSVC,
-        kernel::Symbol=:RBF, degree::Integer=3,
+        kernel::Kernel.KERNEL = Kernel.RadialBasis, degree::Integer=3,
         gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
         cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
         tolerance::Float64=0.001, shrinking::Bool=true,
@@ -324,7 +324,7 @@ function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
     isempty(y) && (svmtype = :oneclassSVM)
 
     _svmtype = SVMS[svmtype]
-    _kernel = KERNELS[kernel]
+    _kernel = Int32(kernel)
     wts = weights
 
     if svmtype == :epsilonSVR || svmtype == :nuSVR
