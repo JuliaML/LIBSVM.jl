@@ -1,26 +1,13 @@
 __precompile__()
 module SVMs
+import LIBLINEAR
+
 
 export svmtrain, svmpredict, fit!, predict, transform,
-        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR
+        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, Linearsolver
 
 include("LibSVMtypes.jl")
-
-const SVMS = Dict{Symbol, Int32}(
-    :CSVC => Int32(0),
-    :nuSVC => Int32(1),
-    :oneclassSVM => Int32(2),
-    :epsilonSVR => Int32(3),
-    :nuSVR => Int32(4)
-    )
-
-const KERNELS = Dict{Symbol, Int32}(
-    :linear => Int32(0),
-    :polynomial => Int32(1),
-    :RBF => Int32(2),
-    :sigmoid => Int32(3),
-    :precomputed => Int32(4)
-    )
+include("constants.jl")
 
 verbosity = false
 

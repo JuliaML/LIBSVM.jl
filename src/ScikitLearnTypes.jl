@@ -7,12 +7,14 @@ import ScikitLearnBase: BaseClassifier, BaseRegressor
 type SVC<:AbstractSVC
     kernel::Symbol
     gamma::Union{Float64,Symbol}
+    weights::Union{Dict, Void}
     cost::Float64
     degree::Int32
     coef0::Float64
     tolerance::Float64
     shrinking::Bool
     probability::Bool
+    verbose::Bool
 
     fit::Union{SVM, Void}
 end
@@ -20,12 +22,14 @@ end
 type NuSVC<:AbstractSVC
     kernel::Symbol
     gamma::Union{Float64,Symbol}
+    weights::Union{Dict, Void}
     nu::Float64
     cost::Float64
     degree::Int32
     coef0::Float64
     tolerance::Float64
     shrinking::Bool
+    verbose::Bool
 
     fit::Union{SVM, Void}
 end
@@ -39,6 +43,7 @@ type OneClassSVM<:AbstractSVC
     coef0::Float64
     tolerance::Float64
     shrinking::Bool
+    verbose::Bool
 
     fit::Union{SVM, Void}
 end
@@ -52,6 +57,7 @@ type NuSVR<:AbstractSVR
     coef0::Float64
     tolerance::Float64
     shrinking::Bool
+    verbose::Bool
 
     fit::Union{SVM, Void}
 end
@@ -65,6 +71,22 @@ type EpsilonSVR<:AbstractSVR
     coef0::Float64
     tolerance::Float64
     shrinking::Bool
+    verbose::Bool
 
     fit::Union{SVM, Void}
+end
+
+"""
+Linear SVM using LIBLINEAR
+"""
+type LinearSVC<:BaseClassifier
+    solver::Type
+    weights::Union{Dict, Void}
+    tolerance::Float64
+    cost::Float64
+    p::Float64
+    bias::Float64
+    verbose::Bool
+
+    fit::Union{LIBLINEAR.LinearModel, Void}
 end
