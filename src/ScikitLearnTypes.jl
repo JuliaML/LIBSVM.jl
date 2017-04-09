@@ -80,7 +80,7 @@ end
 Linear SVM using LIBLINEAR
 """
 type LinearSVC<:BaseClassifier
-    solver::Type
+    solver::Linearsolver.LINEARSOLVER
     weights::Union{Dict, Void}
     tolerance::Float64
     cost::Float64
@@ -90,3 +90,11 @@ type LinearSVC<:BaseClassifier
 
     fit::Union{LIBLINEAR.LinearModel, Void}
 end
+
+#Map types to Int for Libsvm C api
+const SVMTYPES = Dict{Type, Int32}(
+            SVC => 0,
+            NuSVC => 1,
+            OneClassSVM => 2,
+            EpsilonSVR => 3,
+            NuSVR => 4)

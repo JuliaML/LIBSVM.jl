@@ -4,7 +4,8 @@ import LIBLINEAR
 
 
 export svmtrain, svmpredict, fit!, predict, transform,
-        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, Linearsolver
+        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
+        Linearsolver, Kernel
 
 include("LibSVMtypes.jl")
 include("constants.jl")
@@ -32,7 +33,7 @@ function SupportVectors(smc::SVMModel, y, X)
         nSV = Array{Int32}(0)
     end
 
-    yi = smc.param.svm_type == SVMS[:oneclassSVM] ? Float64[] :
+    yi = smc.param.svm_type == OneClassSVM ? Float64[] :
                                                     y[sv_indices]
 
     SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
@@ -40,7 +41,7 @@ function SupportVectors(smc::SVMModel, y, X)
 end
 
 immutable SVM{T}
-    SVMtype::Symbol
+    SVMtype::Type
     kernel::Kernel.KERNEL
     weights::Union{Dict{T, Float64}, Void}
     nfeatures::Int
@@ -123,7 +124,7 @@ end
 
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
-    svm_type = SVMS[mod.SVMtype]
+    svm_type = Int32(SVMTYPES[mod.SVMtype])
     kernel = Int32(mod.kernel)
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
@@ -277,7 +278,7 @@ end
 """
 ```julia
 svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
-    svmtype::Symbol=:CSVC, kernel::Kernel.KERNEL=Kernel.RadialBasis, degree::Integer=3,
+    svmtype::Type=SVC, kernel::Kernel.KERNEL=Kernel.RadialBasis, degree::Integer=3,
     gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
     cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
     tolerance::Float64=0.001, shrinking::Bool=true,
@@ -290,8 +291,8 @@ For one-class SVM use only `X`.
 
 # Arguments
 
-* `svmtype::Symbol=:CSVC`: Type of SVM to train `:CSVC`, `:nuSVC`
-    `:oneclassSVM`, `:epsilonSVR` or `:nuSVR`. Defaults to `:oneclassSVM` if
+* `svmtype::Type=SVMs.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
+    `OneClassSVM`, `EpsilonSVR` or `NuSVR`. Defaults to `OneClassSVM` if
     `y` is not used.
 * `kernel::Kernels.KERNEL=Kernel.RadialBasis`: Model kernel `Linear`, `polynomial`,
     `RadialBasis`, `Sigmoid` or `Precomputed`.
@@ -312,9 +313,8 @@ Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
 """
 function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
-        svmtype::Symbol=:CSVC,
-        kernel::Kernel.KERNEL = Kernel.RadialBasis, degree::Integer=3,
-        gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
+        svmtype::Type=SVC, kernel::Kernel.KERNEL = Kernel.RadialBasis,
+        degree::Integer=3, gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
         cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
         tolerance::Float64=0.001, shrinking::Bool=true,
         probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
@@ -323,16 +323,16 @@ function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
 
     isempty(y) && (svmtype = :oneclassSVM)
 
-    _svmtype = SVMS[svmtype]
+    _svmtype = SVMTYPES[svmtype]
     _kernel = Int32(kernel)
     wts = weights
 
-    if svmtype == :epsilonSVR || svmtype == :nuSVR
+    if svmtype == EpsilonSVR || svmtype == NuSVR
         idx = y
         weight_labels = Int32[]
         weights = Float64[]
         reverse_labels = Float64[]
-    elseif svmtype == :oneclassSVM
+    elseif svmtype == OneClassSVM
         idx = Float64[]
         weight_labels = Int32[]
         weights = Float64[]
@@ -381,7 +381,7 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     ninstances = size(X, 2)
     (nodes, nodeptrs) = instances2nodes(X)
 
-    if model.SVMtype == :oneclassSVM
+    if model.SVMtype == OneClassSVM
         pred = BitArray(ninstances)
     else
         pred = Array{T}(ninstances)
@@ -399,9 +399,9 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
             ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-        if model.SVMtype == :epsilonSVR || model.SVMtype == :nuSVR
+        if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
             pred[i] = output
-        elseif model.SVMtype == :oneclassSVM
+        elseif model.SVMtype == OneClassSVM
             pred[i] = output > 0
         else
             pred[i] = model.labels[round(Int,output)]

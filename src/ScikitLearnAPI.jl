@@ -57,18 +57,11 @@ LinearSVC(;solver = Linearsolver.L2R_L2LOSS_SVC_DUAL,
           verbose::Bool = false) = LinearSVC(solver, weights, tolerance,
           cost, p, bias, verbose, nothing)
 
-const SVMTYPES = Dict{Type, Symbol}(
-            SVC => :CSVC,
-            NuSVC => :nuSVC,
-            OneClassSVM => :oneclassSVM,
-            EpsilonSVR => :epsilonSVR,
-            NuSVR => :nuSVR)
-
 function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vector=[])
     #Build arguments for calling svmtrain
     model.gamma == :auto && (model.gamma = 1.0/size(X, 1))
     kwargs = Tuple{Symbol, Any}[]
-    push!(kwargs, (:svmtype, SVMTYPES[typeof(model)]))
+    push!(kwargs, (:svmtype, typeof(model)))
     for fn in fieldnames(model)
         if fn != :fit
             push!(kwargs, (fn, getfield(model, fn)))
@@ -80,10 +73,8 @@ function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vecto
 end
 
 function fit!(model::LinearSVC, X::AbstractMatrix, y::Vector)
-    model.fit = LIBLINEAR.linear_train(y, X, solver_type =
-        Linearsolver.SOLVERS[model.solver], weights = model.weights,
-        C = model.cost, bias = model.bias, p = model.p, eps = model.tolerance,
-        verbose = model.verbose
-        )
+    model.fit = LIBLINEAR.linear_train(y, X, solver_type = Int32(model.solver),
+    weights = model.weights, C = model.cost, bias = model.bias,
+    p = model.p, eps = model.tolerance, verbose = model.verbose)
     return(model)
 end
