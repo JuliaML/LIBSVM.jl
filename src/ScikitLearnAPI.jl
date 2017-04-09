@@ -1,5 +1,7 @@
 import ScikitLearnBase: predict, predict_proba,
-                        fit!, get_classes, transform, @declare_hyperparameters
+                        fit!, get_classes, transform,
+                        @declare_hyperparameters, get_params,
+                        set_params!
 
 function predict(model::Union{AbstractSVC, AbstractSVR} , X::AbstractArray)
     (p,d) = svmpredict(model.fit, X)
@@ -70,6 +72,23 @@ function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vecto
 
     model.fit = svmtrain(X, y; kwargs...)
     return(model)
+end
+
+function set_params(model::Union{AbstractSVC,AbstractSVR, LinearSVC}; kwargs...)
+    for arg in kwargs
+        setfield!(model, arg...)
+    end
+    return model
+end
+
+function get_params(model::Union{AbstractSVC,AbstractSVR, LinearSVC})
+    params = Dict{Symbol, Any}()
+    for fn in fieldnames(model)
+        if fn != :fit
+            params[fn] = getfield(model, fn)
+        end
+    end
+    return params
 end
 
 function fit!(model::LinearSVC, X::AbstractMatrix, y::Vector)
