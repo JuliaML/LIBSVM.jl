@@ -17,46 +17,50 @@ SVC(;kernel::Symbol = :RBF, gamma::Union{Float64,Symbol} = :auto,
     degree, coef0, tolerance, shrinking, probability, nothing)
 
 NuSVC(;kernel::Symbol = :RBF, gamma::Union{Float64,Symbol} = :auto,
-        nu::Float64 = 0.5,
+        nu::Float64 = 0.5, cost::Float64 = 1.0,
         degree::Int32 = Int32(3), coef0::Float64 = 0.,
         tolerance::Float64 = .001,
-        shrinking::Bool = true) = NuSVC(kernel, gamma, nu,
+        shrinking::Bool = true) = NuSVC(kernel, gamma, nu, cost,
         degree, coef0, tolerance, shrinking, nothing)
 
 OneClassSVM(;kernel::Symbol = :RBF, gamma::Union{Float64,Symbol} = :auto,
-                nu::Float64 = 0.1, degree::Int32 = Int32(3),
-                coef0::Float64 = 0.0, tolerance::Float64 = .001,
-                shrinking::Bool = true) = OneClassSVM(kernel, gamma, nu,
-                degree, coef0, tolerance, shrinking, nothing)
+        nu::Float64 = 0.1, cost::Float64 = 1.0, degree::Int32 = Int32(3),
+        coef0::Float64 = 0.0, tolerance::Float64 = .001,
+        shrinking::Bool = true) = OneClassSVM(kernel, gamma, nu, cost,
+        degree, coef0, tolerance, shrinking, nothing)
 
-function fit!(model::SVC, X::AbstractMatrix, y::Vector)
-    model.gamma == :auto && (model.gamma = 1.0/size(X, 1))
-    model.fit = svmtrain(X, y, svmtype = :CSVC, kernel = model.kernel,
-            gamma = model.gamma,
-            cost = model.cost, coef0 = model.coef0,
-            degree = model.degree, tolerance = model.tolerance,
-            shrinking = model.shrinking, probability = model.probability)
-    return(model)
-end
+NuSVR(;kernel::Symbol = :RBF, gamma::Union{Float64,Symbol} = :auto,
+        nu::Float64 = 0.5, cost::Float64 = 1.0, degree::Int32 = Int32(3), coef0::Float64 = 0.,
+        tolerance::Float64 = .001,
+        shrinking::Bool = true) = NuSVR(kernel, gamma, nu, cost,
+                        degree, coef0, tolerance, shrinking, nothing)
 
-function fit!(model::NuSVC, X::AbstractMatrix, y::Vector)
-    model.gamma == :auto && (model.gamma = 1.0/size(X, 1))
-    model.fit = svmtrain(X, y,
-        svmtype = :nuSVC, kernel = model.kernel,
-        gamma = model.gamma,
-        nu = model.nu, coef0 = model.coef0,
-        degree = model.degree, tolerance = model.tolerance,
-        shrinking = model.shrinking)
-    return(model)
-end
+EpsilonSVR(;kernel::Symbol = :RBF, gamma::Union{Float64,Symbol} = :auto,
+        epsilon::Float64 = 0.1, cost::Float64 = 1.0,
+        degree::Int32 = Int32(3), coef0::Float64 = 0.,
+        tolerance::Float64 = .001,
+        shrinking::Bool = true) = EpsilonSVR(kernel, gamma, epsilon, cost,
+                            degree, coef0, tolerance, shrinking, nothing)
 
-function fit!(model::OneClassSVM, X::AbstractMatrix)
+
+const SVMTYPES = Dict{Type, Symbol}(
+            SVC => :CSVC,
+            NuSVC => :nuSVC,
+            OneClassSVM => :oneclassSVM,
+            EpsilonSVR => :epsilonSVR,
+            NuSVR => :nuSVR)
+
+function fit!(model::AbstractSVM, X::AbstractMatrix, y::Vector=[])
+    #Build arguments for calling svmtrain
     model.gamma == :auto && (model.gamma = 1.0/size(X, 1))
-    model.fit = svmtrain(X,
-        svmtype = :oneclassSVM, kernel = model.kernel,
-        gamma = model.gamma,
-        nu = model.nu, coef0 = model.coef0,
-        degree = model.degree, tolerance = model.tolerance,
-        shrinking = model.shrinking)
+    kwargs = Tuple{Symbol, Any}[]
+    push!(kwargs, (:svmtype, SVMTYPES[typeof(model)]))
+    for fn in fieldnames(model)
+        if fn != :fit
+            push!(kwargs, (fn, getfield(model, fn)))
+        end
+    end
+
+    model.fit = svmtrain(X, y; kwargs...)
     return(model)
 end

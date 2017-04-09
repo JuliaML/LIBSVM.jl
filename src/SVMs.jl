@@ -1,8 +1,8 @@
 __precompile__()
 module SVMs
 
-export svmtrain, svmpredict, fit!, predict, transform
-        SVC, NuSVC, OneClassSVM
+export svmtrain, svmpredict, fit!, predict, transform,
+        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR
 
 include("LibSVMtypes.jl")
 
