@@ -1,7 +1,8 @@
 __precompile__()
 module SVMs
 
-export svmtrain, svmpredict
+export svmtrain, svmpredict, fit!, predict, transform
+        SVC, NuSVC, OneClassSVM
 
 include("LibSVMtypes.jl")
 
@@ -72,7 +73,7 @@ immutable SVM{T}
     gamma::Float64
     cache_size::Float64
     tolerance::Float64
-    C::Float64
+    cost::Float64
     nu::Float64
     epsilon::Float64
     shrinking::Bool
@@ -139,7 +140,7 @@ function svmmodel(mod::SVM)
     kernel = KERNELS[mod.kernel]
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
-                        mod.coef0, mod.cache_size, mod.tolerance, mod.C,
+                        mod.coef0, mod.cache_size, mod.tolerance, mod.cost,
                         length(mod.libsvmweight), pointer(mod.libsvmweightlabel), pointer(mod.libsvmweight),
                         mod.nu, mod.epsilon, Int32(mod.shrinking), Int32(mod.probability))
 
@@ -422,5 +423,8 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
 
     (pred, decvalues)
 end
+
+include("ScikitLearnTypes.jl")
+include("ScikitLearnAPI.jl")
 
 end
