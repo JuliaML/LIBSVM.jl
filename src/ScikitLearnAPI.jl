@@ -1,5 +1,7 @@
+import ScikitLearnBase: predict, predict_proba,
+                        fit!, get_classes, transform, @declare_hyperparameters
 
-function predict(model::AbstractSVM, X::AbstractArray)
+function predict(model::Union{AbstractSVC, AbstractSVR} , X::AbstractArray)
     (p,d) = svmpredict(model.fit, X)
     return p
 end
@@ -50,7 +52,7 @@ const SVMTYPES = Dict{Type, Symbol}(
             EpsilonSVR => :epsilonSVR,
             NuSVR => :nuSVR)
 
-function fit!(model::AbstractSVM, X::AbstractMatrix, y::Vector=[])
+function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vector=[])
     #Build arguments for calling svmtrain
     model.gamma == :auto && (model.gamma = 1.0/size(X, 1))
     kwargs = Tuple{Symbol, Any}[]

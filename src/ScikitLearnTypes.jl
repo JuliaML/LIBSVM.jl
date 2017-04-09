@@ -1,6 +1,8 @@
-abstract AbstractSVM
-abstract AbstractSVC<:AbstractSVM
-abstract AbstractSVR<:AbstractSVM
+using Compat
+import ScikitLearnBase: BaseClassifier, BaseRegressor
+
+@compat abstract type AbstractSVC<:BaseClassifier end
+@compat abstract type AbstractSVR<:BaseRegressor end
 
 type SVC<:AbstractSVC
     kernel::Symbol
@@ -28,7 +30,7 @@ type NuSVC<:AbstractSVC
     fit::Union{SVM, Void}
 end
 
-type OneClassSVM<:AbstractSVM
+type OneClassSVM<:AbstractSVC
     kernel::Symbol
     gamma::Union{Float64,Symbol}
     nu::Float64
