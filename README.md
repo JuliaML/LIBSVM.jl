@@ -14,16 +14,16 @@ This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/
 ## Usage
 
 ```julia
-using RDatasets, LIBSVM
+using RDatasets, SVMs
 
 # Load Fisher's classic iris data
 iris = dataset("datasets", "iris")
 
 # LIBSVM handles multi-class data automatically using a one-against-one strategy
-labels = iris[:Species]
+labels = convert(Vector, iris[:Species])
 
 # First dimension of input data is features; second is instances
-instances = array(iris[:, 1:4])'
+instances = convert(Array, iris[:, 1:4])'
 
 # Train SVM on half of the data using default parameters. See documentation
 # of svmtrain for options
