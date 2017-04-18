@@ -17,7 +17,7 @@ iris = dataset("datasets", "iris")
 labels = iris[:Species]
 
 # First dimension of input data is features; second is instances
-instances = array(iris[:, 1:4])'
+instances = convert(Array, iris[:, 1:4])'
 
 # Train SVM on half of the data using default parameters. See the svmtrain
 # function in LIBSVM.jl for optional parameter settings.
