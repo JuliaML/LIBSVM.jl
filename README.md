@@ -11,8 +11,14 @@ This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/
     and distribution estimation: one-class SVM
 * Model objects are represented by Julia type SVM which gives you easy
   access to model features and can be saved e.g. as JLD file
+* Supports ScikitLearn.jl API
 
 ## Usage
+
+### LIBSVM API
+
+This provides a lower level API similar to LIBSVM C-interface. See `?svmtrain`
+for options.
 
 ```julia
 using RDatasets, LIBSVM
@@ -35,6 +41,28 @@ model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
 
 # Compute accuracy
 @printf "Accuracy: %.2f%%\n" mean((predicted_labels .== labels[2:2:end]))*100
+```
+
+### ScikitLearn API
+
+You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
+
+```julia
+using RDatasets, LIBSVM
+
+#Classification C-SVM
+iris = dataset("datasets", "iris")
+labels = iris[:, 5]
+instances = convert(Matrix{Float64}, iris[:, 1:4]')
+model = fit!(SVC(), instances[:,1:2:end], labels[1:2:end])
+yp = predict(model, instances[:, 2:2:end])
+
+#epsilon-regression
+whiteside = RDatasets.dataset("MASS", "whiteside")
+X = Array(whiteside[:Gas]')
+y = Array(whiteside[:Temp])
+svrmod = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
+yp = predict(svrmod, X)
 ```
 
 ## Credits
