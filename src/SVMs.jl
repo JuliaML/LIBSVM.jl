@@ -33,8 +33,7 @@ function SupportVectors(smc::SVMModel, y, X)
         nSV = Array{Int32}(0)
     end
 
-    yi = smc.param.svm_type == OneClassSVM ? Float64[] :
-                                                    y[sv_indices]
+    yi = smc.param.svm_type == 2 ? Float64[] : y[sv_indices]
 
     SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
                         sv_indices, nodes)
@@ -180,6 +179,7 @@ macro cachedsym(symname)
     end
 end
 @cachedsym svm_train
+@cachedsym svm_predict
 @cachedsym svm_predict_values
 @cachedsym svm_predict_probability
 @cachedsym svm_free_model_content
@@ -321,7 +321,7 @@ function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         cachesize::Float64=200.0, verbose::Bool=false)
     global verbosity
 
-    isempty(y) && (svmtype = :oneclassSVM)
+    isempty(y) && (svmtype = OneClassSVM)
 
     _svmtype = SVMTYPES[svmtype]
     _kernel = Int32(kernel)
@@ -388,7 +388,12 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     end
 
     nlabels = model.nclasses
-    decvalues = Array{Float64}(nlabels, ninstances)
+
+    if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR || model.SVMtype == OneClassSVM || model.probability
+        decvalues = zeros(Float64, nlabels, ninstances)
+    else
+        decvalues = zeros(Float64, Int64(nlabels*(nlabels-1)/2), ninstances)
+    end
 
     verbosity = false
     fn = model.probability ? svm_predict_probability() : svm_predict_values()
@@ -398,7 +403,8 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
 
     for i = 1:ninstances
         output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
-            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+                            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+
         if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
             pred[i] = output
         elseif model.SVMtype == OneClassSVM
