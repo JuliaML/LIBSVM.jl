@@ -1,6 +1,7 @@
 # SVMs.jl
 
 [![Build Status](https://travis-ci.org/mpastell/SVMs.jl.svg?branch=master)](https://travis-ci.org/mpastell/SVMs.jl)
+[![Build status](https://ci.appveyor.com/api/projects/status/uo9ioc72cvowuy7f/branch/master?svg=true)](https://ci.appveyor.com/project/mpastell/svms-jl/branch/master)
 [![Coverage Status](https://coveralls.io/repos/github/mpastell/SVMs.jl/badge.svg?branch=master)](https://coveralls.io/github/mpastell/SVMs.jl?branch=master)
 
 This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
