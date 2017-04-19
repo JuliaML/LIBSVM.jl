@@ -1,8 +1,8 @@
-# SVMs.jl
+# LIBSVM.jl
 
-[![Build Status](https://travis-ci.org/mpastell/SVMs.jl.svg?branch=master)](https://travis-ci.org/mpastell/SVMs.jl)
+[![Build Status](https://travis-ci.org/mpastell/LIBSVM.jl.svg?branch=master)](https://travis-ci.org/mpastell/LIBSVM.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/uo9ioc72cvowuy7f/branch/master?svg=true)](https://ci.appveyor.com/project/mpastell/svms-jl/branch/master)
-[![Coverage Status](https://coveralls.io/repos/github/mpastell/SVMs.jl/badge.svg?branch=master)](https://coveralls.io/github/mpastell/SVMs.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/mpastell/LIBSVM.jl/badge.svg?branch=master)](https://coveralls.io/github/mpastell/LIBSVM.jl?branch=master)
 
 This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
 
@@ -15,7 +15,7 @@ This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/
 ## Usage
 
 ```julia
-using RDatasets, SVMs
+using RDatasets, LIBSVM
 
 # Load Fisher's classic iris data
 iris = dataset("datasets", "iris")
@@ -39,7 +39,7 @@ model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
 
 ## Credits
 
-The library is developed and maintained by Matti Pastell. It is
-based on [LIBSVM.jl](https://github.com/simonster/LIBSVM.jl) by Simon Kornblith.
+The library is currently developed and maintained by Matti Pastell. It was originally
+developed by Simon Kornblith.
 
 [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/) by Chih-Chung Chang and Chih-Jen Lin

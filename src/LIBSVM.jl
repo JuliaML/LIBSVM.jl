@@ -1,5 +1,5 @@
 __precompile__()
-module SVMs
+module LIBSVM
 import LIBLINEAR
 
 
@@ -137,7 +137,7 @@ function svmmodel(mod::SVM)
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
 
-    nodes, ptrs = SVMs.instances2nodes(mod.SVs.X)
+    nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
     data = SVMData(sv_coef, nodes, ptrs)
 
     cmod = SVMModel(param, mod.nclasses, mod.SVs.l, pointer(data.nodeptrs), pointer(data.coefs),
@@ -291,7 +291,7 @@ For one-class SVM use only `X`.
 
 # Arguments
 
-* `svmtype::Type=SVMs.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
+* `svmtype::Type=LIBSVM.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
     `OneClassSVM`, `EpsilonSVR` or `NuSVR`. Defaults to `OneClassSVM` if
     `y` is not used.
 * `kernel::Kernels.KERNEL=Kernel.RadialBasis`: Model kernel `Linear`, `polynomial`,

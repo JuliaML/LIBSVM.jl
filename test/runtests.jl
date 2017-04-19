@@ -1,4 +1,4 @@
-using SVMs, Base.Test
+using LIBSVM, Base.Test
 import RDatasets
 
 iris = readcsv(joinpath(dirname(@__FILE__), "iris.csv"))
