@@ -392,7 +392,8 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
     if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR || model.SVMtype == OneClassSVM || model.probability
         decvalues = zeros(Float64, nlabels, ninstances)
     else
-        decvalues = zeros(Float64, Int64(nlabels*(nlabels-1)/2), ninstances)
+        dcols = max(Int64(nlabels*(nlabels-1)/2), 2)
+        decvalues = zeros(Float64, dcols, ninstances)
     end
 
     verbosity = false
