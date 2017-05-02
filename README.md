@@ -48,7 +48,8 @@ model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
 You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
 
 ```julia
-using RDatasets, LIBSVM
+using LIBSVM
+import RDatasets
 
 #Classification C-SVM
 iris = dataset("datasets", "iris")
