@@ -21,6 +21,13 @@ immutable SupportVectors{T, U}
     SVnodes::Vector{SVMNode}
 end
 
+type SVMTmp
+  pred::Array{Any}
+  decvalues::Array{Float64}
+  nodes::Array{SVMNode}
+  nodeptrs::Array{Ptr{SVMNode}}
+end
+
 function SupportVectors(smc::SVMModel, y, X)
     sv_indices = Array{Int32}(smc.l)
     unsafe_copy!(pointer(sv_indices), smc.sv_indices, smc.l)
@@ -37,6 +44,13 @@ function SupportVectors(smc::SVMModel, y, X)
 
     SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
                         sv_indices, nodes)
+end
+
+#Keep data for SVMModel to prevent GC
+immutable SVMData
+    coefs::Vector{Ptr{Float64}}
+    nodes::Array{SVMNode}
+    nodeptrs::Array{Ptr{SVMNode}}
 end
 
 immutable SVM{T}
@@ -65,6 +79,7 @@ immutable SVM{T}
     epsilon::Float64
     shrinking::Bool
     probability::Bool
+    SVMdata::SVMData
 end
 
 function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
@@ -105,21 +120,28 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
         unsafe_copy!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
+    # creating SVMData already in training not in prediction mode will make predictions faster ...
+    nodes, ptrs = LIBSVM.instances2nodes(svs.X)
+
+    n,m = size(coefs)
+    sv_coef = Vector{Ptr{Float64}}(m)
+    for i in 1:m
+        sv_coef[i] = pointer(coefs, (i-1)*n+1)
+    end
+
+    svmdata = SVMData(sv_coef, nodes, ptrs)
+
     SVM(svmtype, kernel, weights, size(X,1),
         smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
         svs, smc.param.coef0, coefs, probA, probB,
         rho, smc.param.degree,
         smc.param.gamma, smc.param.cache_size, smc.param.eps,
         smc.param.C, smc.param.nu, smc.param.p, Bool(smc.param.shrinking),
-        Bool(smc.param.probability))
+        Bool(smc.param.probability),
+        svmdata
+        )
 end
 
-#Keep data for SVMModel to prevent GC
-immutable SVMData
-    coefs::Vector{Ptr{Float64}}
-    nodes::Array{SVMNode}
-    nodeptrs::Array{Ptr{SVMNode}}
-end
 
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
@@ -131,14 +153,16 @@ function svmmodel(mod::SVM)
                         length(mod.libsvmweight), pointer(mod.libsvmweightlabel), pointer(mod.libsvmweight),
                         mod.nu, mod.epsilon, Int32(mod.shrinking), Int32(mod.probability))
 
-    n,m = size(mod.coefs)
-    sv_coef = Vector{Ptr{Float64}}(m)
-    for i in 1:m
-        sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
-    end
+    # not needed anymore as SVMdata is already contructed during training
+    #n,m = size(mod.coefs)
+    #sv_coef = Vector{Ptr{Float64}}(m)
+    #for i in 1:m
+    #    sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
+    #end
 
-    nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
-    data = SVMData(sv_coef, nodes, ptrs)
+    #nodes, ptrs = LIBSVM.instances2nodes!(mod.SVMdata.nodes, mod.SVMdata.nodeptrs, mod.SVs.X)
+    #data = SVMData(sv_coef, nodes, ptrs)
+    data = mod.SVMdata
 
     cmod = SVMModel(param, mod.nclasses, mod.SVs.l, pointer(data.nodeptrs), pointer(data.coefs),
                 pointer(mod.rho), pointer(mod.probA), pointer(mod.probB), pointer(mod.SVs.indices),
@@ -205,6 +229,20 @@ function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     ninstances = size(instances, 2)
     nodeptrs = Array{Ptr{SVMNode}}(ninstances)
     nodes = Array{SVMNode}(nfeatures + 1, ninstances)
+    instances2nodes!(nodes, nodeptrs, instances)
+
+    (nodes, nodeptrs)
+end
+
+function instances2nodes!{U<:Real}(nodes::Array{SVMNode}, nodeptrs::Array{Ptr{SVMNode}}, instances::AbstractMatrix{U})
+    nfeatures = size(instances, 1)
+    ninstances = size(instances, 2)
+    if(size(nodes) != (nfeatures+1,ninstances))
+      error("size(nodes) has to be equal (size(instances, 1), size(instances, 2))")
+    end
+    if(size(nodeptrs,1) != ninstances)
+      error("size(nodeptrs,1) has to be equal size(instances, 2)")
+    end
 
     for i=1:ninstances
         k = 1
@@ -223,6 +261,14 @@ function instances2nodes{U<:Real}(instances::SparseMatrixCSC{U})
     ninstances = size(instances, 2)
     nodeptrs = Array{Ptr{SVMNode}}(ninstances)
     nodes = Array{SVMNode}(nnz(instances)+ninstances)
+
+    instances2nodes!(nodes, nodeptrs, instances)
+
+    (nodes, nodeptrs)
+end
+
+function instances2nodes!{U<:Real}(nodes::Array{SVMNode}, nodeptrs::Array{Ptr{SVMNode}}, instances::SparseMatrixCSC{U})
+    ninstances = size(instances, 2)
 
     j = 1
     k = 1
@@ -372,29 +418,26 @@ needs to be (nsamples, nfeatures). The method returns tuple
 (predictions, decisionvalues).
 """
 function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
+  svmtmp = init_svmpredict(X, model)
+  svmpredict!(svmtmp, model, X)
+  return (svmtmp.pred, svmtmp.decvalues)
+end
+
+
+function svmpredict!{T,U<:Real}(svmtmp::SVMTmp, model::SVM{T}, X::AbstractMatrix{U})
+    (nodes, nodeptrs, pred, decvalues) = (svmtmp.nodes, svmtmp.nodeptrs, svmtmp.pred, svmtmp.decvalues)
+
     global verbosity
 
     if size(X,1) != model.nfeatures
         error("Model has $(model.nfeatures) but $(size(X, 1)) provided")
     end
 
-    ninstances = size(X, 2)
-    (nodes, nodeptrs) = instances2nodes(X)
-
-    if model.SVMtype == OneClassSVM
-        pred = BitArray(ninstances)
-    else
-        pred = Array{T}(ninstances)
-    end
-
     nlabels = model.nclasses
 
-    if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR || model.SVMtype == OneClassSVM || model.probability
-        decvalues = zeros(Float64, nlabels, ninstances)
-    else
-        dcols = max(Int64(nlabels*(nlabels-1)/2), 2)
-        decvalues = zeros(Float64, dcols, ninstances)
-    end
+    ninstances = size(X, 2)
+
+    instances2nodes!(nodes, nodeptrs, X)
 
     verbosity = false
     fn = model.probability ? svm_predict_probability() : svm_predict_values()
@@ -417,6 +460,28 @@ function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
 
     (pred, decvalues)
 end
+
+function init_svmpredict{T, U<:Real}(X::AbstractMatrix{U}, model::SVM{T})
+  nfeatures = size(X, 1)
+  ninstances = size(X, 2)
+  nodeptrs = Array{Ptr{SVMNode}}(ninstances)
+  nodes = Array{SVMNode}(nfeatures + 1, ninstances)
+  nlabels = model.nclasses
+  if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR || model.SVMtype == OneClassSVM || model.probability
+      decvalues = zeros(Float64, nlabels, ninstances)
+  else
+      dcols = max(Int64(nlabels*(nlabels-1)/2), 2)
+      decvalues = zeros(Float64, dcols, ninstances)
+  end
+  if model.SVMtype == OneClassSVM
+      pred = BitArray(ninstances)
+  else
+      pred = Array{T}(ninstances)
+  end
+  svmtmp = SVMTmp(pred, decvalues, nodes, nodeptrs)
+  return svmtmp
+end
+
 
 include("ScikitLearnTypes.jl")
 include("ScikitLearnAPI.jl")
