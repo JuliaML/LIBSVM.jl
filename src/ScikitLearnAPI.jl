@@ -4,17 +4,17 @@ import ScikitLearnBase: predict, predict_proba,
                         set_params!
 
 function predict(model::Union{AbstractSVC, AbstractSVR} , X::AbstractArray)
-    (p,d) = svmpredict(model.fit, X)
+    (p,d) = svmpredict(model.fit, X')
     return p
 end
 
 function predict(model::LinearSVC, X::AbstractArray)
-    (p,d) = LIBLINEAR.linear_predict(model.fit, X)
+    (p,d) = LIBLINEAR.linear_predict(model.fit, X')
     return p
 end
 
 function transform(model::OneClassSVM, X::AbstractArray)
-    (p,d) = svmpredict(model.fit, X)
+    (p,d) = svmpredict(model.fit, X')
     return p
 end
 
@@ -67,7 +67,7 @@ LinearSVC(;solver = Linearsolver.L2R_L2LOSS_SVC_DUAL,
 
 function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vector=[])
     #Build arguments for calling svmtrain
-    model.gamma == :auto && (model.gamma = 1.0/size(X, 1))
+    model.gamma == :auto && (model.gamma = 1.0/size(X', 1))
     kwargs = Tuple{Symbol, Any}[]
     push!(kwargs, (:svmtype, typeof(model)))
     for fn in fieldnames(model)
@@ -76,7 +76,7 @@ function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vecto
         end
     end
 
-    model.fit = svmtrain(X, y; kwargs...)
+    model.fit = svmtrain(X', y; kwargs...)
     return(model)
 end
 
@@ -98,7 +98,7 @@ function get_params(model::Union{AbstractSVC,AbstractSVR, LinearSVC})
 end
 
 function fit!(model::LinearSVC, X::AbstractMatrix, y::Vector)
-    model.fit = LIBLINEAR.linear_train(y, X, solver_type = Int32(model.solver),
+    model.fit = LIBLINEAR.linear_train(y, X', solver_type = Int32(model.solver),
     weights = model.weights, C = model.cost, bias = model.bias,
     p = model.p, eps = model.tolerance, verbose = model.verbose)
     return(model)
