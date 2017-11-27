@@ -286,7 +286,7 @@ svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
     cachesize::Float64=200.0, verbose::Bool=false)
 ```
 Train Support Vector Machine using LIBSVM using response vector `y`
-and training data `X`. The shape of `X` needs to be (nsamples, nfeatures).
+and training data `X`. The shape of `X` needs to be (nfeatures, nsamples).
 For one-class SVM use only `X`.
 
 # Arguments
