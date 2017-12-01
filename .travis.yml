@@ -7,6 +7,9 @@ os:
   - linux
 notifications:
   email: false
+matrix:
+  allow_failures:
+    - julia: nightly
 after_success:
   - julia -e 'cd(Pkg.dir("LIBSVM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
   - julia -e 'cd(Pkg.dir("LIBSVM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
