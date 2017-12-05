@@ -49,18 +49,18 @@ You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
 
 ```julia
 using LIBSVM
-import RDatasets
+using RDatasets: dataset
 
 #Classification C-SVM
 iris = dataset("datasets", "iris")
-labels = iris[:, 5]
-instances = convert(Matrix{Float64}, iris[:, 1:4]')
-model = fit!(SVC(), instances[:,1:2:end], labels[1:2:end])
-yp = predict(model, instances[:, 2:2:end])
+labels = convert(Vector, iris[:, :Species])
+instances = convert(Array, iris[:, 1:4])
+model = fit!(SVC(), instances[1:2:end, :], labels[1:2:end])
+yp = predict(model, instances[2:2:end, :])
 
 #epsilon-regression
 whiteside = RDatasets.dataset("MASS", "whiteside")
-X = Array(whiteside[:Gas]')
+X = Array(whiteside[:Gas])
 y = Array(whiteside[:Temp])
 svrmod = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
 yp = predict(svrmod, X)
