@@ -1,16 +1,16 @@
 
-immutable SVMNode
+struct SVMNode
     index::Int32
     value::Float64
 end
 
-immutable SVMProblem
+struct SVMProblem
     l::Int32
     y::Ptr{Float64}
     x::Ptr{Ptr{SVMNode}}
 end
 
-immutable SVMParameter
+struct SVMParameter
     svm_type::Int32
     kernel_type::Int32
     degree::Int32
@@ -29,7 +29,7 @@ immutable SVMParameter
     probability::Int32
 end
 
-immutable SVMModel
+struct SVMModel
    param::SVMParameter
    nr_class::Int32
    l::Int32

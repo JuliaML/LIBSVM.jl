@@ -12,7 +12,7 @@ include("constants.jl")
 
 verbosity = false
 
-immutable SupportVectors{T, U}
+struct SupportVectors{T, U}
     l::Int32
     nSV::Vector{Int32}
     y::Vector{T}
@@ -39,7 +39,7 @@ function SupportVectors(smc::SVMModel, y, X)
                         sv_indices, nodes)
 end
 
-immutable SVM{T}
+struct SVM{T}
     SVMtype::Type
     kernel::Kernel.KERNEL
     weights::Union{Dict{T, Float64}, Void}
@@ -67,7 +67,7 @@ immutable SVM{T}
     probability::Bool
 end
 
-function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
+function SVM(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel) where T
     svs = SupportVectors(smc, y, X)
     coefs = zeros(smc.l, smc.nr_class-1)
     for k in 1:(smc.nr_class-1)
@@ -115,7 +115,7 @@ function SVM{T}(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel)
 end
 
 #Keep data for SVMModel to prevent GC
-immutable SVMData
+struct SVMData
     coefs::Vector{Ptr{Float64}}
     nodes::Array{SVMNode}
     nodeptrs::Array{Ptr{SVMNode}}
@@ -184,8 +184,8 @@ end
 @cachedsym svm_predict_probability
 @cachedsym svm_free_model_content
 
-function grp2idx{T, S <: Real}(::Type{S}, labels::AbstractVector,
-    label_dict::Dict{T, Int32}, reverse_labels::Vector{T})
+function grp2idx(::Type{S}, labels::AbstractVector,
+    label_dict::Dict{T, Int32}, reverse_labels::Vector{T}) where {T, S <: Real}
 
     idx = Array{S}(length(labels))
     nextkey = length(reverse_labels) + 1
@@ -200,7 +200,7 @@ function grp2idx{T, S <: Real}(::Type{S}, labels::AbstractVector,
     idx
 end
 
-function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
+function instances2nodes(instances::AbstractMatrix{U}) where U<:Real
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
     nodeptrs = Array{Ptr{SVMNode}}(ninstances)
@@ -219,7 +219,7 @@ function instances2nodes{U<:Real}(instances::AbstractMatrix{U})
     (nodes, nodeptrs)
 end
 
-function instances2nodes{U<:Real}(instances::SparseMatrixCSC{U})
+function instances2nodes(instances::SparseMatrixCSC{U}) where U<:Real
     ninstances = size(instances, 2)
     nodeptrs = Array{Ptr{SVMNode}}(ninstances)
     nodes = Array{SVMNode}(nnz(instances)+ninstances)
@@ -248,9 +248,9 @@ function svmprint(str::Ptr{UInt8})
     nothing
 end
 
-function indices_and_weights{T, U<:Real}(labels::AbstractVector{T},
+function indices_and_weights(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
-        weights::Union{Dict{T, Float64}, Void}=nothing)
+        weights::Union{Dict{T, Float64}, Void}=nothing) where {T, U<:Real}
     label_dict = Dict{T, Int32}()
     reverse_labels = Array{T}(0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
@@ -312,13 +312,13 @@ For one-class SVM use only `X`.
 Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
 """
-function svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
+function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         svmtype::Type=SVC, kernel::Kernel.KERNEL = Kernel.RadialBasis,
         degree::Integer=3, gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
         cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
         tolerance::Float64=0.001, shrinking::Bool=true,
         probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
-        cachesize::Float64=200.0, verbose::Bool=false)
+        cachesize::Float64=200.0, verbose::Bool=false) where {T, U<:Real}
     global verbosity
 
     isempty(y) && (svmtype = OneClassSVM)
@@ -371,7 +371,7 @@ Predict values using `model` based on data `X`. The shape of `X`
 needs to be (nsamples, nfeatures). The method returns tuple
 (predictions, decisionvalues).
 """
-function svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})
+function svmpredict(model::SVM{T}, X::AbstractMatrix{U}) where {T,U<:Real}
     global verbosity
 
     if size(X,1) != model.nfeatures

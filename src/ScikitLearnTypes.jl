@@ -1,10 +1,10 @@
 using Compat
 import ScikitLearnBase: BaseClassifier, BaseRegressor
 
-@compat abstract type AbstractSVC<:BaseClassifier end
-@compat abstract type AbstractSVR<:BaseRegressor end
+abstract type AbstractSVC<:BaseClassifier end
+abstract type AbstractSVR<:BaseRegressor end
 
-type SVC<:AbstractSVC
+mutable struct SVC<:AbstractSVC
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     weights::Union{Dict, Void}
@@ -19,7 +19,7 @@ type SVC<:AbstractSVC
     fit::Union{SVM, Void}
 end
 
-type NuSVC<:AbstractSVC
+mutable struct NuSVC<:AbstractSVC
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     weights::Union{Dict, Void}
@@ -34,7 +34,7 @@ type NuSVC<:AbstractSVC
     fit::Union{SVM, Void}
 end
 
-type OneClassSVM<:AbstractSVC
+mutable struct OneClassSVM<:AbstractSVC
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     nu::Float64
@@ -48,7 +48,7 @@ type OneClassSVM<:AbstractSVC
     fit::Union{SVM, Void}
 end
 
-type NuSVR<:AbstractSVR
+mutable struct NuSVR<:AbstractSVR
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     nu::Float64
@@ -62,7 +62,7 @@ type NuSVR<:AbstractSVR
     fit::Union{SVM, Void}
 end
 
-type EpsilonSVR<:AbstractSVR
+mutable struct EpsilonSVR<:AbstractSVR
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
     epsilon::Float64
@@ -79,7 +79,7 @@ end
 """
 Linear SVM using LIBLINEAR
 """
-type LinearSVC<:BaseClassifier
+mutable struct LinearSVC<:BaseClassifier
     solver::Linearsolver.LINEARSOLVER
     weights::Union{Dict, Void}
     tolerance::Float64
