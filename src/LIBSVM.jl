@@ -368,7 +368,7 @@ end
 `svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})`
 
 Predict values using `model` based on data `X`. The shape of `X`
-needs to be (nsamples, nfeatures). The method returns tuple
+needs to be (nfeatures, nsamples). The method returns tuple
 (predictions, decisionvalues).
 """
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}) where {T,U<:Real}
