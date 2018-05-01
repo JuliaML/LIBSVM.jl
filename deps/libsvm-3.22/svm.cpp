@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <locale.h>
 #include "svm.h"
+#include "omp.h"
 int libsvm_version = LIBSVM_VERSION;
 typedef float Qfloat;
 typedef signed char schar;
@@ -3182,4 +3183,14 @@ void svm_set_print_string_function(void (*print_func)(const char *))
 		svm_print_string = &print_string_stdout;
 	else
 		svm_print_string = print_func;
+}
+
+void svm_set_num_threads(int num_threads)
+{
+	omp_set_num_threads(num_threads);
+}
+
+int svm_get_max_threads()
+{
+	return omp_get_max_threads();
 }

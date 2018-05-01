@@ -66,16 +66,6 @@ svrmod = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
 yp = predict(svrmod, X)
 ```
 
-#Multithreading via OpenMP
-
-You can enable multithreading by 'exporting' the *OMP_NUM_THREADS* variable before training and prediction.
-
-```julia
-@time model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
-ENV{"OMP_NUM_THREADS"} = 8
-@time model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
-```
-
 ## Credits
 
 The library is currently developed and maintained by Matti Pastell. It was originally

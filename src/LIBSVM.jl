@@ -183,6 +183,8 @@ end
 @cachedsym svm_predict_values
 @cachedsym svm_predict_probability
 @cachedsym svm_free_model_content
+@cachedsym svm_set_num_threads
+@cachedsym svm_get_max_threads
 
 function grp2idx(::Type{S}, labels::AbstractVector,
     label_dict::Dict{T, Int32}, reverse_labels::Vector{T}) where {T, S <: Real}
@@ -275,6 +277,23 @@ function indices_and_weights(labels::AbstractVector{T},
     (idx, reverse_labels, weights, weight_labels)
 end
 
+function set_num_threads(nt::Integer)
+
+    if nt == 0
+        if haskey(ENV,"OMP_NUM_THREADS")
+            nt = parse(ENV["OMP_NUM_THREADS"])
+        else
+            nt = 1
+        end
+    end
+
+    if nt < 0
+        nt = ccall(svm_get_max_threads(), Cint, ())
+    end
+
+    ccall(svm_set_num_threads(), Void, (Cint,), nt)
+end
+
 """
 ```julia
 svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
@@ -308,6 +327,7 @@ For one-class SVM use only `X`.
 * `weights::Union{Dict{T, Float64}, Void}=nothing`: dictionary of class weights
 * `cachesize::Float64=100.0`: cache memory size in MB
 * `verbose::Bool=false`: print training output from LIBSVM if true
+* `nt::Integer=0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
 
 Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
@@ -318,8 +338,10 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
         tolerance::Float64=0.001, shrinking::Bool=true,
         probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
-        cachesize::Float64=200.0, verbose::Bool=false) where {T, U<:Real}
+        cachesize::Float64=200.0, verbose::Bool=false, nt::Integer=1) where {T, U<:Real}
     global verbosity
+
+    set_num_threads(nt)
 
     isempty(y) && (svmtype = OneClassSVM)
 
@@ -371,8 +393,10 @@ Predict values using `model` based on data `X`. The shape of `X`
 needs to be (nfeatures, nsamples). The method returns tuple
 (predictions, decisionvalues).
 """
-function svmpredict(model::SVM{T}, X::AbstractMatrix{U}) where {T,U<:Real}
+function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer=0) where {T,U<:Real}
     global verbosity
+
+    set_num_threads(nt)
 
     if size(X,1) != model.nfeatures
         error("Model has $(model.nfeatures) but $(size(X, 1)) provided")
