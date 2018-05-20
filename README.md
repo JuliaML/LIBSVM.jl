@@ -61,6 +61,9 @@ yp = predict(model, instances[2:2:end, :])
 #epsilon-regression
 whiteside = RDatasets.dataset("MASS", "whiteside")
 X = Array(whiteside[:Gas])
+if typeof(X) <: AbstractVector
+    X = reshape(X, (length(X),1))
+end
 y = Array(whiteside[:Temp])
 svrmod = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
 yp = predict(svrmod, X)
