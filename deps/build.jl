@@ -3,9 +3,9 @@ if is_windows()
     lib = joinpath(joinpath(dirname(@__FILE__), "libsvm.dll"))
     info("Downloading LIBSVM binary")
     if Sys.WORD_SIZE == 64
-        download("https://mpastell.github.io/LIBSVM.jl/bindeps/libsvm-3.22_0.dll", lib)
+        download("http://web.ics.purdue.edu/~finej/libsvm-3.22_1.dll", lib)
     else
-        download("https://mpastell.github.io/LIBSVM.jl/bindeps/libsvm32-3.22_0.dll", lib)
+        download("http://web.ics.purdue.edu/~finej/libsvm32-3.22_1.dll", lib)
     end
 else
     cd(joinpath(dirname(@__FILE__), "libsvm-3.22"))
