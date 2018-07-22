@@ -1,7 +1,7 @@
 
-if is_windows()
+if Sys.iswindows()
     lib = joinpath(joinpath(dirname(@__FILE__), "libsvm.dll"))
-    info("Downloading LIBSVM binary")
+    @info("Downloading LIBSVM binary")
     if Sys.WORD_SIZE == 64
         download("http://web.ics.purdue.edu/~finej/libsvm-3.22_1.dll", lib)
     else
