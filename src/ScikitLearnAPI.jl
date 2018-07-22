@@ -59,7 +59,7 @@ EpsilonSVR(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Sym
 @declare_hyperparameters(EpsilonSVR, [:kernel, :gamma, :epsilon, :cost, :degree, :coef0, :tolerance])
 
 LinearSVC(;solver = Linearsolver.L2R_L2LOSS_SVC_DUAL,
-          weights::Union{Dict, Void} = nothing, tolerance::Float64=Inf,
+          weights::Union{Dict, Compat.Nothing} = nothing, tolerance::Float64=Inf,
           cost::Float64 = 1.0, p::Float64 = 0.1, bias::Float64 = -1.0,
           verbose::Bool = false) = LinearSVC(solver, weights, tolerance,
           cost, p, bias, verbose, nothing)
@@ -70,7 +70,7 @@ function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vecto
     model.gamma == :auto && (model.gamma = 1.0/size(X', 1))
     kwargs = Tuple{Symbol, Any}[]
     push!(kwargs, (:svmtype, typeof(model)))
-    for fn in fieldnames(model)
+    for fn in fieldnames(typeof(model))
         if fn != :fit
             push!(kwargs, (fn, getfield(model, fn)))
         end

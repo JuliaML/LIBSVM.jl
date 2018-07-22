@@ -1,11 +1,12 @@
-using LIBSVM, Base.Test
-import RDatasets
+using LIBSVM, Test
+using DelimitedFiles
+using SparseArrays
 
-iris = readcsv(joinpath(dirname(@__FILE__), "iris.csv"))
+iris = readdlm(joinpath(dirname(@__FILE__), "iris.csv"), ',')
 labels = iris[:, 5]
 instances = convert(Matrix{Float64}, iris[:, 1:4]')
 model = svmtrain(instances[:, 1:2:end], labels[1:2:end]; verbose=true)
-gc()
+GC.gc()
 (class, decvalues) = svmpredict(model, instances[:, 2:2:end])
 correct = Bool[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1]
 @test (class .== labels[2:2:end]) == correct
@@ -15,15 +16,17 @@ skclass = predict(skmodel, instances[:, 2:2:end]')
 @test skclass == class
 
 model = svmtrain(sparse(instances[:, 1:2:end]), labels[1:2:end]; verbose=true)
-gc()
+GC.gc()
 (class, decvalues) = svmpredict(model, sparse(instances[:, 2:2:end]))
 correct = Bool[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1]
 @test (class .== labels[2:2:end]) == correct
 
 #Regression tests, results confirmed using e1071 R-package
-whiteside = RDatasets.dataset("MASS", "whiteside")
-X = Array(whiteside[:Gas]')
-y = Array(whiteside[:Temp])
+#whiteside = RDatasets.dataset("MASS", "whiteside")
+whiteside, hdr = readdlm(joinpath(dirname(@__FILE__), "whiteside.csv"), ',', header=true)
+ws = convert(Matrix{Float64}, whiteside[:,2:3])
+X = Array{Float64, 2}(ws[:, 2]')
+y = ws[:, 1]
 
 m = svmtrain(X, y, svmtype = EpsilonSVR, cost = 10., gamma = 1.)
 yeps, d = svmpredict(m, X)

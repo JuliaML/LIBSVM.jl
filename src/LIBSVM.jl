@@ -1,7 +1,9 @@
 __precompile__()
 module LIBSVM
 import LIBLINEAR
-
+using Compat
+using SparseArrays
+using Libdl
 
 export svmtrain, svmpredict, fit!, predict, transform,
         SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
@@ -22,15 +24,15 @@ struct SupportVectors{T, U}
 end
 
 function SupportVectors(smc::SVMModel, y, X)
-    sv_indices = Array{Int32}(smc.l)
-    unsafe_copy!(pointer(sv_indices), smc.sv_indices, smc.l)
+    sv_indices = Array{Int32}(undef, smc.l)
+    unsafe_copyto!(pointer(sv_indices), smc.sv_indices, smc.l)
     nodes = [unsafe_load(unsafe_load(smc.SV, i)) for i in 1:smc.l]
 
     if smc.nSV != C_NULL
-        nSV = Array{Int32}(smc.nr_class)
-        unsafe_copy!(pointer(nSV), smc.nSV, smc.nr_class)
+        nSV = Array{Int32}(undef, smc.nr_class)
+        unsafe_copyto!(pointer(nSV), smc.nSV, smc.nr_class)
     else
-        nSV = Array{Int32}(0)
+        nSV = Array{Int32}(undef, 0)
     end
 
     yi = smc.param.svm_type == 2 ? Float64[] : y[sv_indices]
@@ -42,7 +44,7 @@ end
 struct SVM{T}
     SVMtype::Type
     kernel::Kernel.KERNEL
-    weights::Union{Dict{T, Float64}, Void}
+    weights::Union{Dict{T, Float64}, Compat.Nothing}
     nfeatures::Int
     nclasses::Int32
     labels::Vector{T}
@@ -71,38 +73,38 @@ function SVM(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel) where T
     svs = SupportVectors(smc, y, X)
     coefs = zeros(smc.l, smc.nr_class-1)
     for k in 1:(smc.nr_class-1)
-        unsafe_copy!(pointer(coefs, (k-1)*smc.l +1 ), unsafe_load(smc.sv_coef, k), smc.l)
+        unsafe_copyto!(pointer(coefs, (k-1)*smc.l +1 ), unsafe_load(smc.sv_coef, k), smc.l)
     end
     k = smc.nr_class
     rs = Int(k*(k-1)/2)
-    rho = Vector{Float64}(rs)
-    unsafe_copy!(pointer(rho), smc.rho, rs)
+    rho = Vector{Float64}(undef, rs)
+    unsafe_copyto!(pointer(rho), smc.rho, rs)
 
     if smc.label == C_NULL
-        libsvmlabel = Vector{Int32}(0)
+        libsvmlabel = Vector{Int32}(undef, 0)
     else
-        libsvmlabel = Vector{Int32}(k)
-        unsafe_copy!(pointer(libsvmlabel), smc.label, k)
+        libsvmlabel = Vector{Int32}(undef, k)
+        unsafe_copyto!(pointer(libsvmlabel), smc.label, k)
     end
 
     if smc.probA == C_NULL
         probA = Float64[]
         probB = Float64[]
     else
-        probA = Vector{Float64}(rs)
-        probB = Vector{Float64}(rs)
+        probA = Vector{Float64}(undef, rs)
+        probB = Vector{Float64}(undef, rs)
         unsafe_copy!(pointer(probA), smc.probA, rs)
         unsafe_copy!(pointer(probB), smc.probB, rs)
     end
 
     #Weights
     nw = smc.param.nr_weight
-    libsvmweight = Array{Float64}(nw)
-    libsvmweight_label = Array{Int32}(nw)
+    libsvmweight = Array{Float64}(undef, nw)
+    libsvmweight_label = Array{Int32}(undef, nw)
 
     if nw > 0
-        unsafe_copy!(pointer(libsvmweight), smc.param.weight, nw)
-        unsafe_copy!(pointer(libsvmweight_label), smc.param.weight_label, nw)
+        unsafe_copyto!(pointer(libsvmweight), smc.param.weight, nw)
+        unsafe_copyto!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
     SVM(svmtype, kernel, weights, size(X,1),
@@ -132,7 +134,7 @@ function svmmodel(mod::SVM)
                         mod.nu, mod.epsilon, Int32(mod.shrinking), Int32(mod.probability))
 
     n,m = size(mod.coefs)
-    sv_coef = Vector{Ptr{Float64}}(m)
+    sv_coef = Vector{Ptr{Float64}}(undef, m)
     for i in 1:m
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
@@ -149,20 +151,27 @@ function svmmodel(mod::SVM)
 end
 
 
+function svmprint(str::Ptr{UInt8})
+    if verbosity::Bool
+        print(unsafe_string(str))
+    end
+    nothing
+end
+
+
 let libsvm = C_NULL
     global get_libsvm
     function get_libsvm()
         if libsvm == C_NULL
-            if is_windows()
+            if Sys.iswindows()
                 libsvm = Libdl.dlopen(joinpath(dirname(@__FILE__),  "../deps",
                 "libsvm.dll"))
             else
                 libsvm = Libdl.dlopen(joinpath(dirname(@__FILE__),  "../deps",
                 "libsvm.so.2"))
             end
-            # libsvm = Libdl.dlopen("/usr/local/Cellar/libsvm/3.21/lib/libsvm.2.dylib")
-            ccall(Libdl.dlsym(libsvm, :svm_set_print_string_function), Void,
-                (Ptr{Void},), cfunction(svmprint, Void, (Ptr{UInt8},)))
+            ccall(Libdl.dlsym(libsvm, :svm_set_print_string_function), Compat.Nothing,
+                (Ptr{Compat.Nothing},), @cfunction(svmprint, Compat.Nothing, (Ptr{UInt8},) ))
         end
         libsvm
     end
@@ -178,6 +187,8 @@ macro cachedsym(symname)
         end
     end
 end
+
+
 @cachedsym svm_train
 @cachedsym svm_predict
 @cachedsym svm_predict_values
@@ -189,7 +200,7 @@ end
 function grp2idx(::Type{S}, labels::AbstractVector,
     label_dict::Dict{T, Int32}, reverse_labels::Vector{T}) where {T, S <: Real}
 
-    idx = Array{S}(length(labels))
+    idx = Array{S}(undef, length(labels))
     nextkey = length(reverse_labels) + 1
     for i = 1:length(labels)
         key = labels[i]
@@ -205,8 +216,8 @@ end
 function instances2nodes(instances::AbstractMatrix{U}) where U<:Real
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
-    nodeptrs = Array{Ptr{SVMNode}}(ninstances)
-    nodes = Array{SVMNode}(nfeatures + 1, ninstances)
+    nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
+    nodes = Array{SVMNode}(undef, nfeatures + 1, ninstances)
 
     for i=1:ninstances
         k = 1
@@ -223,8 +234,8 @@ end
 
 function instances2nodes(instances::SparseMatrixCSC{U}) where U<:Real
     ninstances = size(instances, 2)
-    nodeptrs = Array{Ptr{SVMNode}}(ninstances)
-    nodes = Array{SVMNode}(nnz(instances)+ninstances)
+    nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
+    nodes = Array{SVMNode}(undef, nnz(instances)+ninstances)
 
     j = 1
     k = 1
@@ -243,18 +254,12 @@ function instances2nodes(instances::SparseMatrixCSC{U}) where U<:Real
     (nodes, nodeptrs)
 end
 
-function svmprint(str::Ptr{UInt8})
-    if verbosity::Bool
-        print(unsafe_string(str))
-    end
-    nothing
-end
 
 function indices_and_weights(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
-        weights::Union{Dict{T, Float64}, Void}=nothing) where {T, U<:Real}
+        weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing) where {T, U<:Real}
     label_dict = Dict{T, Int32}()
-    reverse_labels = Array{T}(0)
+    reverse_labels = Array{T}(undef, 0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
 
 
@@ -281,7 +286,7 @@ function set_num_threads(nt::Integer)
 
     if nt == 0
         if haskey(ENV,"OMP_NUM_THREADS")
-            nt = parse(ENV["OMP_NUM_THREADS"])
+            nt = parse(Int64, ENV["OMP_NUM_THREADS"])
         else
             nt = 1
         end
@@ -291,7 +296,7 @@ function set_num_threads(nt::Integer)
         nt = ccall(svm_get_max_threads(), Cint, ())
     end
 
-    ccall(svm_set_num_threads(), Void, (Cint,), nt)
+    ccall(svm_set_num_threads(), Compat.Nothing, (Cint,), nt)
 end
 
 """
@@ -301,7 +306,7 @@ svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
     gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
     cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
     tolerance::Float64=0.001, shrinking::Bool=true,
-    probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
+    probability::Bool=false, weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing,
     cachesize::Float64=200.0, verbose::Bool=false)
 ```
 Train Support Vector Machine using LIBSVM using response vector `y`
@@ -324,7 +329,7 @@ For one-class SVM use only `X`.
 * `tolerance::Float64=0.001`: tolerance of termination criterion
 * `shrinking::Bool=true`: whether to use the shrinking heuristics
 * `probability::Bool=false`: whether to train a SVC or SVR model for probability estimates
-* `weights::Union{Dict{T, Float64}, Void}=nothing`: dictionary of class weights
+* `weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing`: dictionary of class weights
 * `cachesize::Float64=100.0`: cache memory size in MB
 * `verbose::Bool=false`: print training output from LIBSVM if true
 * `nt::Integer=0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
@@ -337,7 +342,7 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         degree::Integer=3, gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
         cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
         tolerance::Float64=0.001, shrinking::Bool=true,
-        probability::Bool=false, weights::Union{Dict{T, Float64}, Void}=nothing,
+        probability::Bool=false, weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing,
         cachesize::Float64=200.0, verbose::Bool=false, nt::Integer=1) where {T, U<:Real}
     global verbosity
 
@@ -364,7 +369,7 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
             X, weights)
     end
 
-    param = Array{SVMParameter}(1)
+    param = Array{SVMParameter}(undef, 1)
     param[1] = SVMParameter(_svmtype, _kernel, Int32(degree), Float64(gamma),
         coef0, cachesize, tolerance, cost, Int32(length(weights)),
         pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
@@ -381,7 +386,7 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
     svm = SVM(unsafe_load(mod), y, X, wts, reverse_labels,
         svmtype, kernel)
 
-    ccall(svm_free_model_content(), Void, (Ptr{Void},), mod)
+    ccall(svm_free_model_content(), Compat.Nothing, (Ptr{Compat.Nothing},), mod)
     return (svm)
     #return(mod, weights, weight_labels)
 end
@@ -406,9 +411,9 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer=0) where {T
     (nodes, nodeptrs) = instances2nodes(X)
 
     if model.SVMtype == OneClassSVM
-        pred = BitArray(ninstances)
+        pred = BitArray(undef, ninstances)
     else
-        pred = Array{T}(ninstances)
+        pred = Array{T}(undef, ninstances)
     end
 
     nlabels = model.nclasses
@@ -427,7 +432,7 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer=0) where {T
     ma = [cmod]
 
     for i = 1:ninstances
-        output = ccall(fn, Float64, (Ptr{Void}, Ptr{SVMNode}, Ptr{Float64}),
+        output = ccall(fn, Float64, (Ptr{Compat.Nothing}, Ptr{SVMNode}, Ptr{Float64}),
                             ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
 
         if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
