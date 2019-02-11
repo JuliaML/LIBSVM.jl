@@ -93,8 +93,8 @@ function SVM(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel) where T
     else
         probA = Vector{Float64}(undef, rs)
         probB = Vector{Float64}(undef, rs)
-        unsafe_copy!(pointer(probA), smc.probA, rs)
-        unsafe_copy!(pointer(probB), smc.probB, rs)
+        unsafe_copyto!(pointer(probA), smc.probA, rs)
+        unsafe_copyto!(pointer(probB), smc.probB, rs)
     end
 
     #Weights
