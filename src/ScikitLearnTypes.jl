@@ -1,4 +1,4 @@
-using Compat
+
 import ScikitLearnBase: BaseClassifier, BaseRegressor
 
 abstract type AbstractSVC<:BaseClassifier end
@@ -7,7 +7,7 @@ abstract type AbstractSVR<:BaseRegressor end
 mutable struct SVC<:AbstractSVC
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
-    weights::Union{Dict, Compat.Nothing}
+    weights::Union{Dict, Cvoid}
     cost::Float64
     degree::Int32
     coef0::Float64
@@ -16,13 +16,13 @@ mutable struct SVC<:AbstractSVC
     probability::Bool
     verbose::Bool
 
-    fit::Union{SVM, Compat.Nothing}
+    fit::Union{SVM, Cvoid}
 end
 
 mutable struct NuSVC<:AbstractSVC
     kernel::Kernel.KERNEL
     gamma::Union{Float64,Symbol}
-    weights::Union{Dict, Compat.Nothing}
+    weights::Union{Dict, Cvoid}
     nu::Float64
     cost::Float64
     degree::Int32
@@ -31,7 +31,7 @@ mutable struct NuSVC<:AbstractSVC
     shrinking::Bool
     verbose::Bool
 
-    fit::Union{SVM, Compat.Nothing}
+    fit::Union{SVM, Cvoid}
 end
 
 mutable struct OneClassSVM<:AbstractSVC
@@ -45,7 +45,7 @@ mutable struct OneClassSVM<:AbstractSVC
     shrinking::Bool
     verbose::Bool
 
-    fit::Union{SVM, Compat.Nothing}
+    fit::Union{SVM, Cvoid}
 end
 
 mutable struct NuSVR<:AbstractSVR
@@ -59,7 +59,7 @@ mutable struct NuSVR<:AbstractSVR
     shrinking::Bool
     verbose::Bool
 
-    fit::Union{SVM, Compat.Nothing}
+    fit::Union{SVM, Cvoid}
 end
 
 mutable struct EpsilonSVR<:AbstractSVR
@@ -73,7 +73,7 @@ mutable struct EpsilonSVR<:AbstractSVR
     shrinking::Bool
     verbose::Bool
 
-    fit::Union{SVM, Compat.Nothing}
+    fit::Union{SVM, Cvoid}
 end
 
 """
@@ -81,14 +81,14 @@ Linear SVM using LIBLINEAR
 """
 mutable struct LinearSVC<:BaseClassifier
     solver::Linearsolver.LINEARSOLVER
-    weights::Union{Dict, Compat.Nothing}
+    weights::Union{Dict, Cvoid}
     tolerance::Float64
     cost::Float64
     p::Float64
     bias::Float64
     verbose::Bool
 
-    fit::Union{LIBLINEAR.LinearModel, Compat.Nothing}
+    fit::Union{LIBLINEAR.LinearModel, Cvoid}
 end
 
 #Map types to Int for Libsvm C api

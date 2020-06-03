@@ -4,3 +4,4 @@
 test*.jl
 
 deps/build.log
+Manifest.toml
