@@ -1,9 +1,8 @@
 __precompile__()
 module LIBSVM
 import LIBLINEAR
-using Compat
 using SparseArrays
-using Libdl
+using libsvm_jll
 
 export svmtrain, svmpredict, fit!, predict, transform,
         SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
@@ -44,7 +43,7 @@ end
 struct SVM{T}
     SVMtype::Type
     kernel::Kernel.KERNEL
-    weights::Union{Dict{T, Float64}, Compat.Nothing}
+    weights::Union{Dict{T, Float64}, Cvoid}
     nfeatures::Int
     nclasses::Int32
     labels::Vector{T}
@@ -158,44 +157,11 @@ function svmprint(str::Ptr{UInt8})
     nothing
 end
 
-
-let libsvm = C_NULL
-    global get_libsvm
-    function get_libsvm()
-        if libsvm == C_NULL
-            if Sys.iswindows()
-                libsvm = Libdl.dlopen(joinpath(dirname(@__FILE__),  "../deps",
-                "libsvm.dll"))
-            else
-                libsvm = Libdl.dlopen(joinpath(dirname(@__FILE__),  "../deps",
-                "libsvm.so.2"))
-            end
-            ccall(Libdl.dlsym(libsvm, :svm_set_print_string_function), Compat.Nothing,
-                (Ptr{Compat.Nothing},), @cfunction(svmprint, Compat.Nothing, (Ptr{UInt8},) ))
-        end
-        libsvm
-    end
+function __init__()
+    ccall((:svm_set_print_string_function, libsvm), Cvoid,
+        (Ptr{Cvoid},), @cfunction(svmprint, Cvoid, (Ptr{UInt8},) ))
 end
 
-macro cachedsym(symname)
-    cached = gensym()
-    quote
-        let $cached = C_NULL
-            global ($symname)
-            ($symname)() = ($cached) == C_NULL ?
-                ($cached = Libdl.dlsym(get_libsvm(), $(string(symname)))) : $cached
-        end
-    end
-end
-
-
-@cachedsym svm_train
-@cachedsym svm_predict
-@cachedsym svm_predict_values
-@cachedsym svm_predict_probability
-@cachedsym svm_free_model_content
-@cachedsym svm_set_num_threads
-@cachedsym svm_get_max_threads
 
 function grp2idx(::Type{S}, labels::AbstractVector,
     label_dict::Dict{T, Int32}, reverse_labels::Vector{T}) where {T, S <: Real}
@@ -257,7 +223,7 @@ end
 
 function indices_and_weights(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
-        weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing) where {T, U<:Real}
+        weights::Union{Dict{T, Float64}, Cvoid}=nothing) where {T, U<:Real}
     label_dict = Dict{T, Int32}()
     reverse_labels = Array{T}(undef, 0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
@@ -293,10 +259,10 @@ function set_num_threads(nt::Integer)
     end
 
     if nt < 0
-        nt = ccall(svm_get_max_threads(), Cint, ())
+        nt = ccall((:svm_get_max_threads, libsvm), Cint, ())
     end
 
-    ccall(svm_set_num_threads(), Compat.Nothing, (Cint,), nt)
+    ccall((:svm_set_num_threads, libsvm), Cvoid, (Cint,), nt)
 end
 
 """
@@ -306,7 +272,7 @@ svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
     gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
     cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
     tolerance::Float64=0.001, shrinking::Bool=true,
-    probability::Bool=false, weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing,
+    probability::Bool=false, weights::Union{Dict{T, Float64}, Cvoid}=nothing,
     cachesize::Float64=200.0, verbose::Bool=false)
 ```
 Train Support Vector Machine using LIBSVM using response vector `y`
@@ -329,7 +295,7 @@ For one-class SVM use only `X`.
 * `tolerance::Float64=0.001`: tolerance of termination criterion
 * `shrinking::Bool=true`: whether to use the shrinking heuristics
 * `probability::Bool=false`: whether to train a SVC or SVR model for probability estimates
-* `weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing`: dictionary of class weights
+* `weights::Union{Dict{T, Float64}, Cvoid}=nothing`: dictionary of class weights
 * `cachesize::Float64=100.0`: cache memory size in MB
 * `verbose::Bool=false`: print training output from LIBSVM if true
 * `nt::Integer=0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
@@ -342,7 +308,7 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         degree::Integer=3, gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
         cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
         tolerance::Float64=0.001, shrinking::Bool=true,
-        probability::Bool=false, weights::Union{Dict{T, Float64}, Compat.Nothing}=nothing,
+        probability::Bool=false, weights::Union{Dict{T, Float64}, Cvoid}=nothing,
         cachesize::Float64=200.0, verbose::Bool=false, nt::Integer=1) where {T, U<:Real}
     global verbosity
 
@@ -381,12 +347,12 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         pointer(nodeptrs))]
 
     verbosity = verbose
-    mod = ccall(svm_train(), Ptr{SVMModel}, (Ptr{SVMProblem},
+    mod = ccall((:svm_train, libsvm), Ptr{SVMModel}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
     svm = SVM(unsafe_load(mod), y, X, wts, reverse_labels,
         svmtype, kernel)
 
-    ccall(svm_free_model_content(), Compat.Nothing, (Ptr{Compat.Nothing},), mod)
+    ccall((:svm_free_model_content, libsvm), Cvoid, (Ptr{Cvoid},), mod)
     return (svm)
     #return(mod, weights, weight_labels)
 end
@@ -426,15 +392,18 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer=0) where {T
     end
 
     verbosity = false
-    fn = model.probability ? svm_predict_probability() : svm_predict_values()
 
     cmod, data = svmmodel(model)
     ma = [cmod]
 
     for i = 1:ninstances
-        output = ccall(fn, Float64, (Ptr{Compat.Nothing}, Ptr{SVMNode}, Ptr{Float64}),
+        if model.probability
+            output = ccall((:svm_predict_probability, libsvm ), Float64, (Ptr{Cvoid}, Ptr{SVMNode}, Ptr{Float64}),
                             ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
-
+        else
+            output = ccall((:svm_predict_values, libsvm ), Float64, (Ptr{Cvoid}, Ptr{SVMNode}, Ptr{Float64}),
+                            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+        end
         if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
             pred[i] = output
         elseif model.SVMtype == OneClassSVM

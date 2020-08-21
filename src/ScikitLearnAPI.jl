@@ -59,7 +59,7 @@ EpsilonSVR(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Sym
 @declare_hyperparameters(EpsilonSVR, [:kernel, :gamma, :epsilon, :cost, :degree, :coef0, :tolerance])
 
 LinearSVC(;solver = Linearsolver.L2R_L2LOSS_SVC_DUAL,
-          weights::Union{Dict, Compat.Nothing} = nothing, tolerance::Float64=Inf,
+          weights::Union{Dict, Cvoid} = nothing, tolerance::Float64=Inf,
           cost::Float64 = 1.0, p::Float64 = 0.1, bias::Float64 = -1.0,
           verbose::Bool = false) = LinearSVC(solver, weights, tolerance,
           cost, p, bias, verbose, nothing)
