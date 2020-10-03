@@ -21,13 +21,15 @@ This provides a lower level API similar to LIBSVM C-interface. See `?svmtrain`
 for options.
 
 ```julia
-using RDatasets, LIBSVM
+using LIBSVM
+using RDatasets
+using Printf, Statistics
 
 # Load Fisher's classic iris data
 iris = dataset("datasets", "iris")
 
 # LIBSVM handles multi-class data automatically using a one-against-one strategy
-labels = convert(Vector, iris[:Species])
+labels = levelcode.(iris[:Species])
 
 # First dimension of input data is features; second is instances
 instances = convert(Array, iris[:, 1:4])'
@@ -49,11 +51,11 @@ You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
 
 ```julia
 using LIBSVM
-using RDatasets: dataset
+using RDatasets
 
 #Classification C-SVM
 iris = dataset("datasets", "iris")
-labels = convert(Vector, iris[:, :Species])
+labels = levelcode.(iris[:, :Species])
 instances = convert(Array, iris[:, 1:4])
 model = fit!(SVC(), instances[1:2:end, :], labels[1:2:end])
 yp = predict(model, instances[2:2:end, :])
