@@ -1,22 +1,24 @@
-__precompile__()
 module LIBSVM
+
+
 import LIBLINEAR
+
 using SparseArrays
 using libsvm_jll
 
 export svmtrain, svmpredict, fit!, predict, transform,
-        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
-        Linearsolver, Kernel
+       SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
+       Linearsolver, Kernel
 
 include("LibSVMtypes.jl")
 include("constants.jl")
 
 verbosity = false
 
-struct SupportVectors{T, U}
+struct SupportVectors{T,U}
     l::Int32
     nSV::Vector{Int32}
-    y::Vector{T}
+    y::AbstractVector{T}
     X::AbstractMatrix{U}
     indices::Vector{Int32}
     SVnodes::Vector{SVMNode}
@@ -36,8 +38,7 @@ function SupportVectors(smc::SVMModel, y, X)
 
     yi = smc.param.svm_type == 2 ? Float64[] : y[sv_indices]
 
-    SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
-                        sv_indices, nodes)
+    SupportVectors(smc.l, nSV, yi , X[:,sv_indices], sv_indices, nodes)
 end
 
 struct SVM{T}
@@ -68,7 +69,7 @@ struct SVM{T}
     probability::Bool
 end
 
-function SVM(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel) where T
+function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
     svs = SupportVectors(smc, y, X)
     coefs = zeros(smc.l, smc.nr_class-1)
     for k in 1:(smc.nr_class-1)
@@ -418,5 +419,6 @@ end
 
 include("ScikitLearnTypes.jl")
 include("ScikitLearnAPI.jl")
+
 
 end

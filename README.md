@@ -22,26 +22,27 @@ for options.
 ```julia
 using LIBSVM
 using RDatasets
-using Printf, Statistics
+using Printf
+using Statistics
 
 # Load Fisher's classic iris data
 iris = dataset("datasets", "iris")
 
 # LIBSVM handles multi-class data automatically using a one-against-one strategy
-labels = levelcode.(iris[:Species])
+labels = iris.Species
 
 # First dimension of input data is features; second is instances
-instances = convert(Array, iris[:, 1:4])'
+instances = Matrix(iris[:, 1:4])'
 
 # Train SVM on half of the data using default parameters. See documentation
 # of svmtrain for options
-model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
+model = svmtrain(instances[:, 1:2:end], labels[1:2:end])
 
 # Test model on the other half of the data.
-(predicted_labels, decision_values) = svmpredict(model, instances[:, 2:2:end]);
+predicted_labels, decision_values = svmpredict(model, instances[:, 2:2:end]);
 
 # Compute accuracy
-@printf "Accuracy: %.2f%%\n" mean((predicted_labels .== labels[2:2:end]))*100
+@printf "Accuracy: %.2f%%\n" mean(predicted_labels .== labels[2:2:end]) * 100
 ```
 
 ### ScikitLearn API
@@ -52,10 +53,11 @@ You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
 using LIBSVM
 using RDatasets
 
-#Classification C-SVM
+# Classification C-SVM
 iris = dataset("datasets", "iris")
-labels = levelcode.(iris[:, :Species])
-instances = convert(Array, iris[:, 1:4])
+labels = iris.Species
+instances = Matrix(iris[:, 1:4])
+
 model = fit!(SVC(), instances[1:2:end, :], labels[1:2:end])
 yp = predict(model, instances[2:2:end, :])
 
