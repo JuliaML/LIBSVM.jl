@@ -1,8 +1,7 @@
 # LIBSVM.jl
 
 [![Build Status](https://github.com/JuliaML/LIBSVM.jl/workflows/CI/badge.svg)](https://github.com/JuliaML/LIBSVM.jl/actions?query=workflow%3ACI)
-[![Build Status](https://ci.appveyor.com/api/projects/status/1v8jpbiy1o7mpi6q/branch/master?svg=true)](https://ci.appveyor.com/project/mpastell/libsvm-jl/branch/master)
-[![Coverage Status](https://coveralls.io/repos/github/mpastell/LIBSVM.jl/badge.svg?branch=master)](https://coveralls.io/github/mpastell/LIBSVM.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/JuliaML/LIBSVM.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaML/LIBSVM.jl?branch=master)
 
 This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
 
