@@ -20,6 +20,8 @@ end
 
 
 @testset "IRIS" begin
+    @info "test iris"
+
     iris = readdlm(joinpath(@__DIR__, "iris.csv"), ',')
     labels = iris[:, 5]
 
@@ -32,13 +34,15 @@ end
     skclass = predict(skmodel, instances[:, 2:2:end]')
     @test skclass == class
 
-    model = svmtrain(sparse(instances[:, 1:2:end]), labels[1:2:end]; verbose=true)
+    model = svmtrain(sparse(instances[:, 1:2:end]), labels[1:2:end]; verbose = true)
     GC.gc()
     test_iris_model(model, sparse(instances[:, 2:2:end]), labels[2:2:end])
 end
 
 
 @testset "AbstractVector as labels" begin
+    @info "test AbstractVector labels"
+
     iris = dataset("datasets", "iris")
     X = Matrix(iris[:, 1:4])'
     y = iris.Species
@@ -58,8 +62,9 @@ end
 
 @testset "Whiteside" begin
     #Regression tests, results confirmed using e1071 R-package
+    @info "test Whiteside"
+
     whiteside = RDatasets.dataset("MASS", "whiteside")
-    # whiteside, hdr = readdlm(joinpath(@__DIR__, "whiteside.csv"), ',', header=true)
     ws = convert(Matrix{Float64}, whiteside[:,2:3])
     X = Array{Float64, 2}(ws[:, 2]')
     y = ws[:, 1]
