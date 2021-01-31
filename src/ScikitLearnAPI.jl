@@ -65,7 +65,7 @@ LinearSVC(;solver = Linearsolver.L2R_L2LOSS_SVC_DUAL,
           cost, p, bias, verbose, nothing)
 @declare_hyperparameters(LinearSVC, [:solver, :weights, :tolerance, :cost, :p, :bias])
 
-function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::Vector=[])
+function fit!(model::Union{AbstractSVC,AbstractSVR}, X::AbstractMatrix, y::AbstractVector = [])
     #Build arguments for calling svmtrain
     model.gamma == :auto && (model.gamma = 1.0/size(X', 1))
     kwargs = Tuple{Symbol, Any}[]
@@ -97,7 +97,7 @@ function get_params(model::Union{AbstractSVC,AbstractSVR, LinearSVC})
     return params
 end
 
-function fit!(model::LinearSVC, X::AbstractMatrix, y::Vector)
+function fit!(model::LinearSVC, X::AbstractMatrix, y::AbstractVector)
     model.fit = LIBLINEAR.linear_train(y, X', solver_type = Int32(model.solver),
     weights = model.weights, C = model.cost, bias = model.bias,
     p = model.p, eps = model.tolerance, verbose = model.verbose)

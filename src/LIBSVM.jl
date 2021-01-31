@@ -1,22 +1,24 @@
-__precompile__()
 module LIBSVM
+
+
 import LIBLINEAR
+
 using SparseArrays
 using libsvm_jll
 
 export svmtrain, svmpredict, fit!, predict, transform,
-        SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
-        Linearsolver, Kernel
+       SVC, NuSVC, OneClassSVM, NuSVR, EpsilonSVR, LinearSVC,
+       Linearsolver, Kernel
 
 include("LibSVMtypes.jl")
 include("constants.jl")
 
 verbosity = false
 
-struct SupportVectors{T, U}
+struct SupportVectors{T,U}
     l::Int32
     nSV::Vector{Int32}
-    y::Vector{T}
+    y::AbstractVector{T}
     X::AbstractMatrix{U}
     indices::Vector{Int32}
     SVnodes::Vector{SVMNode}
@@ -36,8 +38,7 @@ function SupportVectors(smc::SVMModel, y, X)
 
     yi = smc.param.svm_type == 2 ? Float64[] : y[sv_indices]
 
-    SupportVectors(smc.l, nSV, yi , X[:,sv_indices],
-                        sv_indices, nodes)
+    SupportVectors(smc.l, nSV, yi , X[:,sv_indices], sv_indices, nodes)
 end
 
 struct SVM{T}
@@ -68,7 +69,7 @@ struct SVM{T}
     probability::Bool
 end
 
-function SVM(smc::SVMModel, y::T, X, weights, labels, svmtype, kernel) where T
+function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
     svs = SupportVectors(smc, y, X)
     coefs = zeros(smc.l, smc.nr_class-1)
     for k in 1:(smc.nr_class-1)
@@ -266,39 +267,48 @@ function set_num_threads(nt::Integer)
 end
 
 """
-```julia
-svmtrain{T, U<:Real}(X::AbstractMatrix{U}, y::AbstractVector{T}=[];
-    svmtype::Type=SVC, kernel::Kernel.KERNEL=Kernel.RadialBasis, degree::Integer=3,
-    gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
-    cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
-    tolerance::Float64=0.001, shrinking::Bool=true,
-    probability::Bool=false, weights::Union{Dict{T, Float64}, Cvoid}=nothing,
-    cachesize::Float64=200.0, verbose::Bool=false)
-```
+    svmtrain(
+        X::AbstractMatrix{U}, y::AbstractVector{T} = [];
+        svmtype::Type = SVC,
+        kernel::Kernel.KERNEL = Kernel.RadialBasis,
+        degree::Integer = 3,
+        gamma::Float64 = 1.0/size(X, 1),
+        coef0::Float64 = 0.0,
+        cost::Float64=1.0,
+        nu::Float64 = 0.5,
+        epsilon::Float64 = 0.1,
+        tolerance::Float64 = 0.001,
+        shrinking::Bool = true,
+        probability::Bool = false,
+        weights::Union{Dict{T,Float64},Cvoid} = nothing,
+        cachesize::Float64 = 200.0,
+        verbose::Bool = false
+    ) where {T,U<:Real}
+
 Train Support Vector Machine using LIBSVM using response vector `y`
-and training data `X`. The shape of `X` needs to be (nfeatures, nsamples).
+and training data `X`. The shape of `X` needs to be `(nfeatures, nsamples)`.
 For one-class SVM use only `X`.
 
 # Arguments
 
-* `svmtype::Type=LIBSVM.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
+* `svmtype::Type = LIBSVM.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
     `OneClassSVM`, `EpsilonSVR` or `NuSVR`. Defaults to `OneClassSVM` if
     `y` is not used.
-* `kernel::Kernels.KERNEL=Kernel.RadialBasis`: Model kernel `Linear`, `Polynomial`,
+* `kernel::Kernels.KERNEL = Kernel.RadialBasis`: Model kernel `Linear`, `Polynomial`,
     `RadialBasis`, `Sigmoid` or `Precomputed`.
-* `degree::Integer=3`: Kernel degree. Used for polynomial kernel
-* `gamma::Float64=1.0/size(X, 1)` : γ for kernels
-* `coef0::Float64=0.0`: parameter for sigmoid and polynomial kernel
-* `cost::Float64=1.0`: cost parameter C of C-SVC, epsilon-SVR, and nu-SVR
-* `nu::Float64=0.5`: parameter nu of nu-SVC, one-class SVM, and nu-SVR
-* `epsilon::Float64=0.1`: epsilon in loss function of epsilon-SVR
-* `tolerance::Float64=0.001`: tolerance of termination criterion
-* `shrinking::Bool=true`: whether to use the shrinking heuristics
-* `probability::Bool=false`: whether to train a SVC or SVR model for probability estimates
+* `degree::Integer = 3`: Kernel degree. Used for polynomial kernel
+* `gamma::Float64 = 1.0/size(X, 1)` : γ for kernels
+* `coef0::Float64 = 0.0`: parameter for sigmoid and polynomial kernel
+* `cost::Float64 = 1.0`: cost parameter C of C-SVC, epsilon-SVR, and nu-SVR
+* `nu::Float64 = 0.5`: parameter nu of nu-SVC, one-class SVM, and nu-SVR
+* `epsilon::Float64 = 0.1`: epsilon in loss function of epsilon-SVR
+* `tolerance::Float64 = 0.001`: tolerance of termination criterion
+* `shrinking::Bool = true`: whether to use the shrinking heuristics
+* `probability::Bool = false`: whether to train a SVC or SVR model for probability estimates
 * `weights::Union{Dict{T, Float64}, Cvoid}=nothing`: dictionary of class weights
-* `cachesize::Float64=100.0`: cache memory size in MB
-* `verbose::Bool=false`: print training output from LIBSVM if true
-* `nt::Integer=0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
+* `cachesize::Float64 = 100.0`: cache memory size in MB
+* `verbose::Bool = false`: print training output from LIBSVM if true
+* `nt::Integer = 0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
 
 Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
@@ -418,5 +428,6 @@ end
 
 include("ScikitLearnTypes.jl")
 include("ScikitLearnAPI.jl")
+
 
 end

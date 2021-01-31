@@ -22,26 +22,33 @@ for options.
 ```julia
 using LIBSVM
 using RDatasets
-using Printf, Statistics
+using Printf
+using Statistics
 
 # Load Fisher's classic iris data
 iris = dataset("datasets", "iris")
 
-# LIBSVM handles multi-class data automatically using a one-against-one strategy
-labels = levelcode.(iris[:Species])
+# First four dimension of input data is features
+X = Matrix(iris[:, 1:4])'
 
-# First dimension of input data is features; second is instances
-instances = convert(Array, iris[:, 1:4])'
+# LIBSVM handles multi-class data automatically using a one-against-one strategy
+y = iris.Species
+
+# Split the dataset into training set and testing set
+Xtrain = X[:, 1:2:end]
+Xtest  = X[:, 2:2:end]
+ytrain = y[1:2:end]
+ytest  = y[2:2:end]
 
 # Train SVM on half of the data using default parameters. See documentation
 # of svmtrain for options
-model = svmtrain(instances[:, 1:2:end], labels[1:2:end]);
+model = svmtrain(Xtrain, ytrain)
 
 # Test model on the other half of the data.
-(predicted_labels, decision_values) = svmpredict(model, instances[:, 2:2:end]);
+ŷ, decision_values = svmpredict(model, Xtest);
 
 # Compute accuracy
-@printf "Accuracy: %.2f%%\n" mean((predicted_labels .== labels[2:2:end]))*100
+@printf "Accuracy: %.2f%%\n" mean(ŷ .== ytest) * 100
 ```
 
 ### ScikitLearn API
@@ -52,22 +59,29 @@ You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
 using LIBSVM
 using RDatasets
 
-#Classification C-SVM
+# Classification C-SVM
 iris = dataset("datasets", "iris")
-labels = levelcode.(iris[:, :Species])
-instances = convert(Array, iris[:, 1:4])
-model = fit!(SVC(), instances[1:2:end, :], labels[1:2:end])
-yp = predict(model, instances[2:2:end, :])
+X = Matrix(iris[:, 1:4])
+y = iris.Species
 
-#epsilon-regression
+Xtrain = X[1:2:end, :]
+Xtest  = X[2:2:end, :]
+ytrain = y[1:2:end]
+ytest  = y[2:2:end]
+
+model = fit!(SVC(), Xtrain, ytrain)
+ŷ = predict(model, Xtest)
+```
+
+```julia
+# Epsilon-Regression
+
 whiteside = RDatasets.dataset("MASS", "whiteside")
-X = Array(whiteside[:Gas])
-if typeof(X) <: AbstractVector
-    X = reshape(X, (length(X),1))
-end
-y = Array(whiteside[:Temp])
-svrmod = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
-yp = predict(svrmod, X)
+X = Matrix(whiteside[:, 3:3])  # the `Gas` column
+y = whiteside.Temp
+
+model = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
+ŷ = predict(model, X)
 ```
 
 ## Credits
