@@ -15,5 +15,7 @@ module Linearsolver
 end
 
 module Kernel
+
 @enum KERNEL Linear Polynomial RadialBasis Sigmoid Precomputed
+
 end

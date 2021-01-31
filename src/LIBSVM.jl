@@ -13,8 +13,6 @@ export svmtrain, svmpredict, fit!, predict, transform,
 include("LibSVMtypes.jl")
 include("constants.jl")
 
-verbosity = false
-
 struct SupportVectors{T,U}
     l::Int32
     nSV::Vector{Int32}
@@ -150,17 +148,11 @@ function svmmodel(mod::SVM)
     return cmod, data
 end
 
-
-function svmprint(str::Ptr{UInt8})
-    if verbosity::Bool
-        print(unsafe_string(str))
-    end
-    nothing
-end
+svmnoprint(str::Ptr{UInt8})::Cvoid = nothing
 
 function __init__()
     ccall((:svm_set_print_string_function, libsvm), Cvoid,
-        (Ptr{Cvoid},), @cfunction(svmprint, Cvoid, (Ptr{UInt8},) ))
+          (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
 end
 
 
@@ -313,15 +305,23 @@ For one-class SVM use only `X`.
 Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
 """
-function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
-        svmtype::Type=SVC, kernel::Kernel.KERNEL = Kernel.RadialBasis,
-        degree::Integer=3, gamma::Float64=1.0/size(X, 1), coef0::Float64=0.0,
-        cost::Float64=1.0, nu::Float64=0.5, epsilon::Float64=0.1,
-        tolerance::Float64=0.001, shrinking::Bool=true,
-        probability::Bool=false, weights::Union{Dict{T, Float64}, Cvoid}=nothing,
-        cachesize::Float64=200.0, verbose::Bool=false, nt::Integer=1) where {T, U<:Real}
-    global verbosity
-
+function svmtrain(
+        X::AbstractMatrix{U}, y::AbstractVector{T} = [];
+        svmtype::Type = SVC,
+        kernel::Kernel.KERNEL = Kernel.RadialBasis,
+        degree::Integer = 3,
+        gamma::Float64 = 1.0 / size(X, 1),
+        coef0::Float64 = 0.0,
+        cost::Float64 = 1.0,
+        nu::Float64 = 0.5,
+        epsilon::Float64 = 0.1,
+        tolerance::Float64 = 0.001,
+        shrinking::Bool = true,
+        probability::Bool = false,
+        weights::Union{Dict{T,Float64},Cvoid} = nothing,
+        cachesize::Float64 = 200.0,
+        verbose::Bool = false,
+        nt::Integer = 1) where {T,U<:Real}
     set_num_threads(nt)
 
     isempty(y) && (svmtype = OneClassSVM)
@@ -356,27 +356,32 @@ function svmtrain(X::AbstractMatrix{U}, y::AbstractVector{T} = [];
     problem = SVMProblem[SVMProblem(Int32(size(X, 2)), pointer(idx),
         pointer(nodeptrs))]
 
-    verbosity = verbose
+    if verbose
+        # set to stdout
+        ccall((:svm_set_print_string_function, libsvm), Cvoid,
+              (Ptr{Cvoid},), Ptr{Cvoid}())
+    else
+        ccall((:svm_set_print_string_function, libsvm), Cvoid,
+              (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
+    end
+
     mod = ccall((:svm_train, libsvm), Ptr{SVMModel}, (Ptr{SVMProblem},
         Ptr{SVMParameter}), problem, param)
     svm = SVM(unsafe_load(mod), y, X, wts, reverse_labels,
         svmtype, kernel)
 
     ccall((:svm_free_model_content, libsvm), Cvoid, (Ptr{Cvoid},), mod)
-    return (svm)
-    #return(mod, weights, weight_labels)
+    return svm
 end
 
 """
-`svmpredict{T,U<:Real}(model::SVM{T}, X::AbstractMatrix{U})`
+    svmpredict(model::SVM{T}, X::AbstractMatrix{U}) where {T,U<:Real}
 
-Predict values using `model` based on data `X`. The shape of `X`
-needs to be (nfeatures, nsamples). The method returns tuple
-(predictions, decisionvalues).
+Predict values using `model` based on data `X`.
+The shape of `X` needs to be `(nfeatures, nsamples)`.
+The method returns tuple `(predictions, decisionvalues)`.
 """
-function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer=0) where {T,U<:Real}
-    global verbosity
-
+function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
     if size(X,1) != model.nfeatures
@@ -401,7 +406,8 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer=0) where {T
         decvalues = zeros(Float64, dcols, ninstances)
     end
 
-    verbosity = false
+    ccall((:svm_set_print_string_function, libsvm), Cvoid,
+          (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
 
     cmod, data = svmmodel(model)
     ma = [cmod]
