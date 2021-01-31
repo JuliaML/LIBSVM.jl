@@ -156,7 +156,7 @@ function __init__()
     ccall((:svm_set_print_string_function, libsvm), Cvoid,
           (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
 
-    libsvm_version[] = unsafe_load(cglobal((:libsvm_version, :libsvm), Cint))
+    libsvm_version[] = unsafe_load(cglobal((:libsvm_version, libsvm), Cint))
 end
 
 
