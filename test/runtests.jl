@@ -1,4 +1,6 @@
 using DelimitedFiles
+using FileIO
+using JLD2
 using LIBSVM
 using RDatasets
 using SparseArrays
@@ -27,16 +29,16 @@ end
 
     instances = Matrix{Float64}(iris[:, 1:4]')
     model = svmtrain(instances[:, 1:2:end], labels[1:2:end]; verbose = true)
-    GC.gc()
     class = test_iris_model(model, instances[:, 2:2:end], labels[2:2:end])
 
-    skmodel = fit!(SVC(), instances[:,1:2:end]', labels[1:2:end])
-    skclass = predict(skmodel, instances[:, 2:2:end]')
-    @test skclass == class
+    @testset "sklearn API" begin
+        skmodel = fit!(SVC(), instances[:,1:2:end]', labels[1:2:end])
+        skclass = predict(skmodel, instances[:, 2:2:end]')
+        @test skclass == class
 
-    model = svmtrain(sparse(instances[:, 1:2:end]), labels[1:2:end]; verbose = true)
-    GC.gc()
-    test_iris_model(model, sparse(instances[:, 2:2:end]), labels[2:2:end])
+        model = svmtrain(sparse(instances[:, 1:2:end]), labels[1:2:end]; verbose = true)
+        test_iris_model(model, sparse(instances[:, 2:2:end]), labels[2:2:end])
+    end
 end
 
 
@@ -56,7 +58,41 @@ end
     ŷ = test_iris_model(model, Xtest, ytest)
 
     model = fit!(SVC(), Xtrain', ytrain)
-    @assert ŷ == predict(model, Xtest')
+    @test ŷ == predict(model, Xtest')
+end
+
+
+@testset "JLD2 save/load" begin
+    @info "JLD2 save/load"
+
+    iris = dataset("datasets", "iris")
+    X = Matrix(iris[:, 1:4])'
+    y = iris.Species
+
+    Xtrain = X[:, 1:2:end]
+    Xtest  = X[:, 2:2:end]
+    ytrain = y[1:2:end]
+    ytest  = y[2:2:end]
+
+    model = svmtrain(Xtrain, ytrain, verbose = true)
+    ŷ = test_iris_model(model, Xtest, ytest)
+
+    mktempdir() do path
+        f = joinpath(path, "test.jld2")
+        @save f model
+
+        model′ = load(f, "model")
+        test_iris_model(model′, Xtest, ytest)
+    end
+
+    model = fit!(SVC(), Xtrain', ytrain)
+    mktempdir() do path
+        f = joinpath(path, "test.jld2")
+        @save f model
+
+        model′ = load(f, "model")
+        @test ŷ == predict(model′, Xtest')
+    end
 end
 
 
