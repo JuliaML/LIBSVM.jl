@@ -21,6 +21,11 @@ function test_iris_model(model, X, y)
 end
 
 
+@testset "libsvm version" begin
+    @test LIBSVM.libsvm_version[] ≥ 322
+end
+
+
 @testset "IRIS" begin
     @info "test iris"
 

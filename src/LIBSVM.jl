@@ -150,9 +150,13 @@ end
 
 svmnoprint(str::Ptr{UInt8})::Cvoid = nothing
 
+const libsvm_version = Ref{Cint}(0)
+
 function __init__()
     ccall((:svm_set_print_string_function, libsvm), Cvoid,
           (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
+
+    libsvm_version[] = unsafe_load(cglobal((:libsvm_version, libsvm), Cint))
 end
 
 
@@ -172,7 +176,7 @@ function grp2idx(::Type{S}, labels::AbstractVector,
     idx
 end
 
-function instances2nodes(instances::AbstractMatrix{U}) where U<:Real
+function instances2nodes(instances::AbstractMatrix{<:Real})
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
     nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
@@ -191,7 +195,7 @@ function instances2nodes(instances::AbstractMatrix{U}) where U<:Real
     (nodes, nodeptrs)
 end
 
-function instances2nodes(instances::SparseMatrixCSC{U}) where U<:Real
+function instances2nodes(instances::SparseMatrixCSC{<:Real})
     ninstances = size(instances, 2)
     nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
     nodes = Array{SVMNode}(undef, nnz(instances)+ninstances)
