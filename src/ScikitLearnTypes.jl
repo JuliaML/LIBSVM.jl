@@ -91,10 +91,11 @@ mutable struct LinearSVC<:BaseClassifier
     fit::Union{LIBLINEAR.LinearModel, Cvoid}
 end
 
-#Map types to Int for Libsvm C api
+# Map types to Int for Libsvm C api
+# https://github.com/cjlin1/libsvm/blob/557d85749aaf0ca83fd229af0f00e4f4cb7be85c/svm.h#L25
 const SVMTYPES = Dict{Type, Int32}(
-            SVC => 0,
-            NuSVC => 1,
-            OneClassSVM => 2,
-            EpsilonSVR => 3,
-            NuSVR => 4)
+    SVC         => 0,
+    NuSVC       => 1,
+    OneClassSVM => 2,
+    EpsilonSVR  => 3,
+    NuSVR       => 4)

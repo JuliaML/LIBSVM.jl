@@ -297,7 +297,7 @@ For one-class SVM use only `X`.
 * `tolerance::Float64 = 0.001`: tolerance of termination criterion
 * `shrinking::Bool = true`: whether to use the shrinking heuristics
 * `probability::Bool = false`: whether to train a SVC or SVR model for probability estimates
-* `weights::Union{Dict{T, Float64}, Cvoid}=nothing`: dictionary of class weights
+* `weights::Union{Dict{T, Float64}, Cvoid} = nothing`: dictionary of class weights
 * `cachesize::Float64 = 100.0`: cache memory size in MB
 * `verbose::Bool = false`: print training output from LIBSVM if true
 * `nt::Integer = 0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
