@@ -9,7 +9,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 libsvm_jll = "08558c22-525a-5d2a-acf6-0ac6658ffce4"
 
 [compat]
-LIBLINEAR = "0.5"
+LIBLINEAR = "0.5, 0.6"
 ScikitLearnBase = "0.5"
 julia = "1.3"
 
