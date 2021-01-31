@@ -42,7 +42,7 @@ end
 struct SVM{T}
     SVMtype::Type
     kernel::Kernel.KERNEL
-    weights::Union{Dict{T, Float64}, Cvoid}
+    weights::Union{Dict{T,Float64},Cvoid}
     nfeatures::Int
     nclasses::Int32
     labels::Vector{T}
@@ -95,7 +95,7 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
         unsafe_copyto!(pointer(probB), smc.probB, rs)
     end
 
-    #Weights
+    # Weights
     nw = smc.param.nr_weight
     libsvmweight = Array{Float64}(undef, nw)
     libsvmweight_label = Array{Int32}(undef, nw)
@@ -298,7 +298,7 @@ For one-class SVM use only `X`.
 * `shrinking::Bool = true`: whether to use the shrinking heuristics
 * `probability::Bool = false`: whether to train a SVC or SVR model for probability estimates
 * `weights::Union{Dict{T, Float64}, Cvoid} = nothing`: dictionary of class weights
-* `cachesize::Float64 = 100.0`: cache memory size in MB
+* `cachesize::Float64 = 200.0`: cache memory size in MB
 * `verbose::Bool = false`: print training output from LIBSVM if true
 * `nt::Integer = 0`: number of OpenMP cores to use, if 0 it is set to OMP_NUM_THREADS, if negative it is set to the max number of threads
 
@@ -330,7 +330,7 @@ function svmtrain(
     _kernel = Int32(kernel)
     wts = weights
 
-    if svmtype == EpsilonSVR || svmtype == NuSVR
+    if svmtype ∈ (EpsilonSVR, NuSVR)
         idx = y
         weight_labels = Int32[]
         weights = Float64[]
@@ -341,8 +341,7 @@ function svmtrain(
         weights = Float64[]
         reverse_labels = Bool[]
     else
-        (idx, reverse_labels, weights, weight_labels) = indices_and_weights(y,
-            X, weights)
+        idx, reverse_labels, weights, weight_labels = indices_and_weights(y, X, weights)
     end
 
     param = Array{SVMParameter}(undef, 1)
@@ -359,7 +358,7 @@ function svmtrain(
     if verbose
         # set to stdout
         ccall((:svm_set_print_string_function, libsvm), Cvoid,
-              (Ptr{Cvoid},), Ptr{Cvoid}())
+              (Ptr{Cvoid},), C_NULL)
     else
         ccall((:svm_set_print_string_function, libsvm), Cvoid,
               (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))

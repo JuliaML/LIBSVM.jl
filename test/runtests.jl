@@ -29,10 +29,12 @@ end
 
     instances = Matrix{Float64}(iris[:, 1:4]')
     model = svmtrain(instances[:, 1:2:end], labels[1:2:end]; verbose = true)
+    GC.gc()
     class = test_iris_model(model, instances[:, 2:2:end], labels[2:2:end])
 
     @testset "sklearn API" begin
         skmodel = fit!(SVC(), instances[:,1:2:end]', labels[1:2:end])
+        GC.gc()
         skclass = predict(skmodel, instances[:, 2:2:end]')
         @test skclass == class
 
