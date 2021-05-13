@@ -13,11 +13,11 @@ export svmtrain, svmpredict, fit!, predict, transform,
 include("LibSVMtypes.jl")
 include("constants.jl")
 
-struct SupportVectors{T,U}
+struct SupportVectors{T<:AbstractVector,U<:AbstractMatrix}
     l::Int32
     nSV::Vector{Int32}
-    y::AbstractVector{T}
-    X::AbstractMatrix{U}
+    y::T
+    X::U
     indices::Vector{Int32}
     SVnodes::Vector{SVMNode}
 end
