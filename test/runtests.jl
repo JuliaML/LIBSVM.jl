@@ -108,7 +108,7 @@ end
     @info "test Whiteside"
 
     whiteside = RDatasets.dataset("MASS", "whiteside")
-    ws = convert(Matrix{Float64}, whiteside[:,2:3])
+    ws = Matrix{Float64}(whiteside[:,2:3])
     X = Array{Float64, 2}(ws[:, 2]')
     y = ws[:, 1]
 
