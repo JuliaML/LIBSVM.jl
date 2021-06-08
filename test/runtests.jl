@@ -151,5 +151,10 @@ end
     end
 end
 
+@testset "Check parameters" begin
+    bad_params = Dict(:svmtype => OneClassSVM, :probability => true)
+    @test_throws ArgumentError svmtrain(rand(2, 5), ones(5); bad_params...)
+end
+
 
 end  # @testset "LIBSVM"
