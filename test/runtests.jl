@@ -168,4 +168,16 @@ end
     @test d ≈ d̃
 end
 
+@testset "Precomputed kernel" begin
+   X = [-2 -1 -1 1 1 2; -1 -1 -2 1 2 1]
+   y = [1, 1, 1, 2, 2, 2]
+
+   K = X' * X
+
+   model = svmtrain(K, y, kernel=Kernel.Precomputed, verbose=true)
+
+   @test model.coefs ≈ [0.25; -0.25]
+   @test model.SVs.indices == [2, 4]
+end
+
 end  # @testset "LIBSVM"

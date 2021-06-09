@@ -182,7 +182,7 @@ function instances2nodes(instances::AbstractMatrix{<:Real})
 
     for i=1:ninstances
         for j=1:nfeatures
-            nodes[j, i] = SVMNode(Int32(j), Float64(instances[j, i]))
+            nodes[j, i] = SVMNode(Int32(j-1), Float64(instances[j, i]))
         end
         nodes[end, i] = SVMNode(Int32(-1), NaN)
         nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
@@ -213,20 +213,12 @@ function instances2nodes(instances::SparseMatrixCSC{<:Real})
     (nodes, nodeptrs)
 end
 
-
 function indices_and_weights(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
         weights::Union{Dict{T, Float64}, Cvoid}=nothing) where {T, U<:Real}
     label_dict = Dict{T, Int32}()
     reverse_labels = Array{T}(undef, 0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
-
-
-    if length(labels) != size(instances, 2)
-        error("""Size of second dimension of training instance matrix
-        ($(size(instances, 2))) does not match length of labels
-        ($(length(labels)))""")
-    end
 
     # Construct SVMParameter
     if weights == nothing || length(weights) == 0
@@ -249,6 +241,20 @@ function set_num_threads(nt::Integer)
         nt = libsvm_get_max_threads()
     end
     libsvm_set_num_threads(nt)
+end
+
+function check_dims(X, y, kernel)
+    if kernel == Kernel.Precomputed
+        if size(X, 1) != size(X, 2)
+            throw(ArgumentError("The input matrix must be square"))
+        end
+    end
+
+    if size(y, 1) != size(X, 2)
+        throw(ArgumentError("Size of second dimension of training instance
+                            matrix ($(size(X, 2))) does not match length of
+                            labels ($(size(y, 1)))"))
+    end
 end
 
 """
@@ -334,6 +340,7 @@ function svmtrain(
         weights = Float64[]
         reverse_labels = Bool[]
     else
+        check_dims(X, y, kernel)
         idx, reverse_labels, weights, weight_labels = indices_and_weights(y, X, weights)
     end
 
@@ -344,8 +351,13 @@ function svmtrain(
         Int32(probability))
 
     # Construct SVMProblem
-    (nodes, nodeptrs) = instances2nodes(X)
-    problem = SVMProblem(Int32(size(X, 2)), pointer(idx), pointer(nodeptrs))
+    if kernel == Kernel.Precomputed
+        (nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
+    else
+        (nodes, nodeptrs) = instances2nodes(X)
+    end
+    problem = SVMProblem(Int32(size(X, 2)), pointer(idx),
+                         pointer(nodeptrs))
 
     # Validate the given parameters
     libsvm_check_parameter(problem, param)
