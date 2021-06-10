@@ -262,6 +262,17 @@ function set_num_threads(nt::Integer)
     ccall((:svm_set_num_threads, libsvm), Cvoid, (Cint,), nt)
 end
 
+function check_parameter(problem::Vector{SVMProblem}, param::Vector{SVMParameter})
+    @assert length(problem) == 1
+    @assert length(param) == 1
+    err = ccall((:svm_check_parameter, libsvm), Cstring,
+                (Ptr{SVMProblem}, Ptr{SVMParameter}),
+                problem, param)
+    if err != C_NULL
+        throw(ArgumentError("Incorrect parameter: $(unsafe_string(err))"))
+    end
+end
+
 """
     svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
@@ -358,6 +369,9 @@ function svmtrain(
     (nodes, nodeptrs) = instances2nodes(X)
     problem = SVMProblem[SVMProblem(Int32(size(X, 2)), pointer(idx),
         pointer(nodeptrs))]
+
+    # Validate the given parameters
+    check_parameter(problem, param)
 
     if verbose
         # set to stdout
