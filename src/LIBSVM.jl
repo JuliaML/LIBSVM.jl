@@ -427,7 +427,6 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
           (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
 
     cmod, data = svmmodel(model)
-
     ma = [cmod]
 
     for i = 1:ninstances
