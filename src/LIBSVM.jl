@@ -246,14 +246,14 @@ end
 function check_dims(X, y, kernel)
     if kernel == Kernel.Precomputed
         if size(X, 1) != size(X, 2)
-            throw(ArgumentError("The input matrix must be square"))
+            throw(DimensionMismatch("The input matrix must be square"))
         end
     end
 
     if size(y, 1) != size(X, 2)
-        throw(ArgumentError("Size of second dimension of training instance
-                            matrix ($(size(X, 2))) does not match length of
-                            labels ($(size(y, 1)))"))
+        throw(DimensionMismatch("Size of second dimension of training instance
+                                matrix ($(size(X, 2))) does not match length of
+                                labels ($(size(y, 1)))"))
     end
 end
 

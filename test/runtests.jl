@@ -169,6 +169,12 @@ end
 end
 
 @testset "Precomputed kernel" begin
+    @testset "Input matrix validation" begin
+        nonsquare_mat = rand(5, 6)
+        y = rand(Bool, size(nonsquare_mat, 1))
+        @test_throws DimensionMismatch svmtrain(nonsquare_mat, y,
+                                                kernel=Kernel.Precomputed)
+    end
    X = [-2 -1 -1 1 1 2; -1 -1 -2 1 2 1]
    y = [1, 1, 1, 2, 2, 2]
 
