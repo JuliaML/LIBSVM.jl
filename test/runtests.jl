@@ -175,15 +175,21 @@ end
         @test_throws DimensionMismatch svmtrain(nonsquare_mat, y,
                                                 kernel=Kernel.Precomputed)
     end
-   X = [-2 -1 -1 1 1 2; -1 -1 -2 1 2 1]
-   y = [1, 1, 1, 2, 2, 2]
 
-   K = X' * X
+    X = [-2 -1 -1 1 1 2; -1 -1 -2 1 2 1]
+    y = [1, 1, 1, 2, 2, 2]
 
-   model = svmtrain(K, y, kernel=Kernel.Precomputed, verbose=true)
+    K = X' * X
 
-   @test model.coefs ≈ [0.25; -0.25]
-   @test model.SVs.indices == [2, 4]
+    model = svmtrain(K, y, kernel=Kernel.Precomputed)
+
+    @test model.coef0 ≈ 0
+    @test model.coefs ≈ [0.25; -0.25]
+    @test model.SVs.indices == [2, 4]
+
+    ỹ, _ = svmpredict(model, K)
+
+    @test y == ỹ
 end
 
 end  # @testset "LIBSVM"

@@ -350,14 +350,16 @@ function svmtrain(
         pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
         Int32(probability))
 
+    ninstances = size(X, 2)
+
     # Construct SVMProblem
     if kernel == Kernel.Precomputed
-        (nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
+        X = [1:size(X, 1) X]'
+        (nodes, nodeptrs) = instances2nodes(X)
     else
         (nodes, nodeptrs) = instances2nodes(X)
     end
-    problem = SVMProblem(Int32(size(X, 2)), pointer(idx),
-                         pointer(nodeptrs))
+    problem = SVMProblem(Int32(ninstances), pointer(idx), pointer(nodeptrs))
 
     # Validate the given parameters
     libsvm_check_parameter(problem, param)
@@ -389,12 +391,16 @@ The method returns tuple `(predictions, decisionvalues)`.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if size(X, 1) != model.nfeatures
+    if model.kernel != Kernel.Precomputed && size(X,1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
-    (nodes, nodeptrs) = instances2nodes(X)
+    if model.kernel == Kernel.Precomputed
+        (nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
+    else
+        (nodes, nodeptrs) = instances2nodes(X)
+    end
 
     pred = if model.SVMtype == OneClassSVM
         BitArray(undef, ninstances)
