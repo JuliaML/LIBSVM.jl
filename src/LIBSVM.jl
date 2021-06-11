@@ -1,6 +1,5 @@
 module LIBSVM
 
-
 import LIBLINEAR
 
 using SparseArrays
@@ -12,6 +11,7 @@ export svmtrain, svmpredict, fit!, predict, transform,
 
 include("LibSVMtypes.jl")
 include("constants.jl")
+include("libcalls.jl")
 
 struct SupportVectors{T<:AbstractVector,U<:AbstractMatrix}
     l::Int32
@@ -153,9 +153,7 @@ svmnoprint(str::Ptr{UInt8})::Cvoid = nothing
 const libsvm_version = Ref{Cint}(0)
 
 function __init__()
-    ccall((:svm_set_print_string_function, libsvm), Cvoid,
-          (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
-
+    libsvm_set_verbose(false)
     libsvm_version[] = unsafe_load(cglobal((:libsvm_version, libsvm), Cint))
 end
 
@@ -183,12 +181,10 @@ function instances2nodes(instances::AbstractMatrix{<:Real})
     nodes = Array{SVMNode}(undef, nfeatures + 1, ninstances)
 
     for i=1:ninstances
-        k = 1
         for j=1:nfeatures
-            nodes[k, i] = SVMNode(Int32(j), Float64(instances[j, i]))
-            k += 1
+            nodes[j, i] = SVMNode(Int32(j), Float64(instances[j, i]))
         end
-        nodes[k, i] = SVMNode(Int32(-1), NaN)
+        nodes[end, i] = SVMNode(Int32(-1), NaN)
         nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
     end
 
@@ -246,29 +242,13 @@ function indices_and_weights(labels::AbstractVector{T},
 end
 
 function set_num_threads(nt::Integer)
-
     if nt == 0
-        if haskey(ENV,"OMP_NUM_THREADS")
-            nt = parse(Int64, ENV["OMP_NUM_THREADS"])
-        else
-            nt = 1
-        end
+        nt = parse(Int64, get(ENV, "OMP_NUM_THREADS", "1"))
     end
-
     if nt < 0
-        nt = ccall((:svm_get_max_threads, libsvm), Cint, ())
+        nt = libsvm_get_max_threads()
     end
-
-    ccall((:svm_set_num_threads, libsvm), Cvoid, (Cint,), nt)
-end
-
-function check_parameter(problem::SVMProblem, param::SVMParameter)
-    err = ccall((:svm_check_parameter, libsvm), Cstring,
-                (Ref{SVMProblem}, Ref{SVMParameter}),
-                problem, param)
-    if err != C_NULL
-        throw(ArgumentError("Incorrect parameter: $(unsafe_string(err))"))
-    end
+    libsvm_set_num_threads(nt)
 end
 
 """
@@ -368,23 +348,16 @@ function svmtrain(
     problem = SVMProblem(Int32(size(X, 2)), pointer(idx), pointer(nodeptrs))
 
     # Validate the given parameters
-    check_parameter(problem, param)
+    libsvm_check_parameter(problem, param)
 
-    if verbose
-        # set to stdout
-        ccall((:svm_set_print_string_function, libsvm), Cvoid,
-              (Ptr{Cvoid},), C_NULL)
-    else
-        ccall((:svm_set_print_string_function, libsvm), Cvoid,
-              (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
-    end
+    libsvm_set_verbose(verbose)
 
-    mod = ccall((:svm_train, libsvm), Ptr{SVMModel},
-                (Ref{SVMProblem}, Ref{SVMParameter}),
-                problem, param)
-    svm = SVM(unsafe_load(mod), y, X, wts, reverse_labels, svmtype, kernel)
+    ptr_model = libsvm_train(problem, param)
+    svm = SVM(unsafe_load(ptr_model), y, X, wts, reverse_labels, svmtype,
+              kernel)
 
-    ccall((:svm_free_model_content, libsvm), Cvoid, (Ptr{Cvoid},), mod)
+    libsvm_free_model(ptr_model)
+
     return svm
 end
 
@@ -420,19 +393,15 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
         decvalues = zeros(Float64, dcols, ninstances)
     end
 
-    ccall((:svm_set_print_string_function, libsvm), Cvoid,
-          (Ptr{Cvoid},), @cfunction(svmnoprint, Cvoid, (Ptr{UInt8},)))
+    libsvm_set_verbose(false)
 
     cmod, data = svmmodel(model)
-    ma = [cmod]
 
     for i = 1:ninstances
         if model.probability
-            output = ccall((:svm_predict_probability, libsvm ), Float64, (Ptr{Cvoid}, Ptr{SVMNode}, Ptr{Float64}),
-                            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+            output = libsvm_predict_probability(cmod, nodeptrs[i], decvalues[:, i])
         else
-            output = ccall((:svm_predict_values, libsvm ), Float64, (Ptr{Cvoid}, Ptr{SVMNode}, Ptr{Float64}),
-                            ma, nodeptrs[i], pointer(decvalues, nlabels*(i-1)+1))
+            output = libsvm_predict_values(cmod, nodeptrs[i], decvalues[:, i])
         end
         if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
             pred[i] = output
@@ -448,6 +417,5 @@ end
 
 include("ScikitLearnTypes.jl")
 include("ScikitLearnAPI.jl")
-
 
 end
