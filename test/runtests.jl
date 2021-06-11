@@ -161,7 +161,7 @@ end
     d = [1.5 1.0 1.5 -1.0 -1.5 -1.5;
          0.0 0.0 0.0  0.0  0.0  0.0]
 
-    model = svmtrain(X, y, kernel=Kernel.Linear)
+    model = svmtrain(X, y, kernel = Kernel.Linear)
     ỹ, d̃ = svmpredict(model, X)
 
     @test ỹ == y
