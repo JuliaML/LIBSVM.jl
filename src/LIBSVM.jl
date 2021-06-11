@@ -395,10 +395,11 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
-    ninstances = size(X, 2)
     if model.kernel == Kernel.Precomputed
+        ninstances = size(X, 1)
         (nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
     else
+        ninstances = size(X, 2)
         (nodes, nodeptrs) = instances2nodes(X)
     end
 

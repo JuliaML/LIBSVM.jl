@@ -176,20 +176,55 @@ end
                                                 kernel=Kernel.Precomputed)
     end
 
-    X = [-2 -1 -1 1 1 2; -1 -1 -2 1 2 1]
-    y = [1, 1, 1, 2, 2, 2]
+    @testset "Trivial data" begin
+        X = [-2 -1 -1 1 1 2; -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
 
-    K = X' * X
+        K = X' * X
 
-    model = svmtrain(K, y, kernel=Kernel.Precomputed)
+        model = svmtrain(K, y, kernel=Kernel.Precomputed)
 
-    @test model.coef0 ≈ 0
-    @test model.coefs ≈ [0.25; -0.25]
-    @test model.SVs.indices == [2, 4]
+        @test model.rho ≈ [0]
+        @test model.coefs ≈ [0.25; -0.25]
+        @test model.SVs.indices == [2, 4]
 
-    ỹ, _ = svmpredict(model, K)
+        ỹ, _ = svmpredict(model, K)
+        @test y == ỹ
 
-    @test y == ỹ
+        T = [-1 2 3; -1 2 2]
+        K = T' * X
+
+        ỹ, _ = svmpredict(model, K)
+        @test [1, 2, 2] == ỹ
+    end
+
+    @testset "Random data" begin
+        K = [ 0.28 0.97 0.75 0.48 0.39 0.68 0.52 0.14
+             ;0.97 0.23 0.01 0.76 0.06 0.06 0.25 0.23
+             ;0.75 0.01 0.03 0.27 0.69 0.43 0.3  0.67
+             ;0.48 0.76 0.27 0.36 0.35 0.39 0.56 0.80
+             ;0.39 0.06 0.69 0.35 0.39 0.42 0.49 0.22
+             ;0.68 0.06 0.43 0.39 0.42 0.13 0.37 0.66
+             ;0.52 0.25 0.30 0.56 0.49 0.37 0.66 0.54
+             ;0.14 0.23 0.67 0.80 0.22 0.66 0.54 0.13 ]
+        y = [1, 1, 2, 2, 1, 1, 2, 1]
+
+        model = svmtrain(K, y, kernel=Kernel.Precomputed)
+
+        @test model.rho ≈ [-1.1449999948963523]
+        @test model.coefs ≈ [1; 1; 1; -1; -1; -1]
+        @test model.SVs.indices == [1, 5, 8, 3, 4, 7]
+
+        ỹ, _ = svmpredict(model, K)
+        @test ỹ == [1, 1, 1, 1, 1, 1, 1, 2]
+
+        K = [ 0.34 0.75 0.97 0.39 0.23 0.52 0.68 0.14
+             ;0.12 0.27 0.76 0.35 0.36 0.56 0.39 0.80
+             ;0.45 0.90 0.32 0.12 0.05 1.49 0.42 0.22
+             ;0.24 0.67 0.23 0.22 0.80 0.54 0.66 0.13 ]
+        ỹ, _ = svmpredict(model, K)
+        @test ỹ == [2, 1, 1, 1]
+    end
 end
 
 end  # @testset "LIBSVM"
