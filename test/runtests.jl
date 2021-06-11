@@ -4,6 +4,7 @@ using JLD2
 using LIBSVM
 using RDatasets
 using SparseArrays
+using Statistics
 using Test
 
 @testset "LibSVM" begin
@@ -19,18 +20,20 @@ function test_iris_model(model, X, y)
     ŷ
 end
 
+function load_iris()
+    iris = readdlm(joinpath(@__DIR__, "iris.csv"), ',')
+    labels = iris[:, 5]
+    instances = Matrix{Float64}(iris[:, 1:4]')
+    return instances, labels
+end
+
 @testset "libsvm version" begin
     @test LIBSVM.libsvm_version[] ≥ 322
 end
 
-
 @testset "IRIS" begin
     @info "test iris"
-
-    iris = readdlm(joinpath(@__DIR__, "iris.csv"), ',')
-    labels = iris[:, 5]
-
-    instances = Matrix{Float64}(iris[:, 1:4]')
+    instances, labels = load_iris()
     model = svmtrain(instances[:, 1:2:end], labels[1:2:end]; verbose = true)
     GC.gc()
     class = test_iris_model(model, instances[:, 2:2:end], labels[2:2:end])
@@ -224,6 +227,23 @@ end
              ;0.24 0.67 0.23 0.22 0.80 0.54 0.66 0.13 ]
         ỹ, _ = svmpredict(model, K)
         @test ỹ == [2, 1, 1, 1]
+    end
+
+    @testset "Iris data" begin
+        X, y = load_iris()
+
+        K = X' * X
+
+        model  = svmtrain(K, y, kernel=Kernel.Precomputed)
+        model₂ = svmtrain(X, y, kernel=Kernel.Linear)
+
+        @test model.rho ≈ model₂.rho
+        @test model.coefs ≈ model₂.coefs
+        @test model.SVs.indices ≈ model₂.SVs.indices
+
+        ỹ, _  = svmpredict(model, K)
+
+        @test mean(y .== ỹ) > .99
     end
 end
 
