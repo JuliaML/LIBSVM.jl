@@ -35,7 +35,7 @@ end
 
 function libsvm_predict_probability(model::SVMModel, nodes::Ptr{SVMNode},
         decisions::Vector{Float64})
-    return ccall((:svm_predict_probability, libsvm), Float64,
+    return ccall((:svm_predict_probability, libsvm), Cdouble,
                  (Ref{SVMModel}, Ptr{SVMNode}, Ref{Float64}),
                  model, node, decisions)
 end
