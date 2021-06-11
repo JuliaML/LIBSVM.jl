@@ -399,9 +399,11 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
 
     for i = 1:ninstances
         if model.probability
-            output = libsvm_predict_probability(cmod, nodeptrs[i], decvalues[:, i])
+            output = libsvm_predict_probability(cmod, nodeptrs[i],
+                                                Ref(decvalues, nlabels*(i-1)+1))
         else
-            output = libsvm_predict_values(cmod, nodeptrs[i], decvalues[:, i])
+            output = libsvm_predict_values(cmod, nodeptrs[i],
+                                           Ref(decvalues, nlabels*(i-1)+1))
         end
         if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
             pred[i] = output

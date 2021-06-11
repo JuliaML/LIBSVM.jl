@@ -48,7 +48,6 @@ end
     end
 end
 
-
 @testset "AbstractVector as labels" begin
     @info "test AbstractVector labels"
 
@@ -67,7 +66,6 @@ end
     model = fit!(SVC(), Xtrain', ytrain)
     @test ŷ == predict(model, Xtest')
 end
-
 
 @testset "JLD2 save/load" begin
     @info "JLD2 save/load"
@@ -156,5 +154,18 @@ end
     @test_throws ArgumentError svmtrain(rand(2, 5), ones(5); bad_params...)
 end
 
+@testset "Decision values" begin
+    X = [-2 -1 -1 1 1 2;
+         -1 -1 -2 1 2 1]
+    y = [1, 1, 1, 2, 2, 2]
+    d = [1.5 1.0 1.5 -1.0 -1.5 -1.5;
+         0.0 0.0 0.0  0.0  0.0  0.0]
+
+    model = svmtrain(X, y, kernel=Kernel.Linear)
+    ỹ, d̃ = svmpredict(model, X)
+
+    @test ỹ == y
+    @test d ≈ d̃
+end
 
 end  # @testset "LIBSVM"
