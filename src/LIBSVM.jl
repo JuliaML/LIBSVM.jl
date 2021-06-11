@@ -397,21 +397,14 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
 
     cmod, data = svmmodel(model)
 
-    for i = 1:ninstances
-        if model.probability
-            output = libsvm_predict_probability(cmod, nodeptrs[i],
-                                                Ref(decvalues, nlabels*(i-1)+1))
-        else
-            output = libsvm_predict_values(cmod, nodeptrs[i],
-                                           Ref(decvalues, nlabels*(i-1)+1))
-        end
-        if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
-            pred[i] = output
-        elseif model.SVMtype == OneClassSVM
-            pred[i] = output > 0
-        else
-            pred[i] = model.labels[round(Int,output)]
-        end
+    predf = ifelse(model.probability, libsvm_predict_probability, libsvm_predict_values)
+    decode = model.SVMtype ∈ (EpsilonSVR, NuSVR) ? identity :
+             model.SVMtype == OneClassSVM        ? >(0)     :
+             (x -> model.labels[round(Int, x)])
+    f = decode ∘ predf
+
+    for i ∈ Base.OneTo(ninstances)
+        pred[i] = f(cmod, nodeptrs[i], Ref(decvalues, nlabels * (i - 1) + 1))
     end
 
     (pred, decvalues)
