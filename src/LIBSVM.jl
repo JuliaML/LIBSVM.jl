@@ -378,10 +378,10 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
     ninstances = size(X, 2)
     (nodes, nodeptrs) = instances2nodes(X)
 
-    if model.SVMtype == OneClassSVM
-        pred = BitArray(undef, ninstances)
+    pred = if model.SVMtype == OneClassSVM
+        BitArray(undef, ninstances)
     else
-        pred = Array{T}(undef, ninstances)
+        Array{T}(undef, ninstances)
     end
 
     nlabels = model.nclasses
