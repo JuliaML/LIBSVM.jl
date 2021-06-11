@@ -371,8 +371,8 @@ The method returns tuple `(predictions, decisionvalues)`.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if size(X,1) != model.nfeatures
-        error("Model has $(model.nfeatures) but $(size(X, 1)) provided")
+    if size(X, 1) != model.nfeatures
+        throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
