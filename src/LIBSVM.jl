@@ -357,15 +357,15 @@ function svmtrain(
         idx, reverse_labels, weights, weight_labels = indices_and_weights(y, X, weights)
     end
 
-    param = SVMParameter(_svmtype, _kernel, Int32(degree), Float64(gamma),
+    param = SVMParameter(
+        _svmtype, _kernel, Int32(degree), Float64(gamma),
         coef0, cachesize, tolerance, cost, Int32(length(weights)),
         pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
         Int32(probability))
 
     # Construct SVMProblem
     (nodes, nodeptrs) = instances2nodes(X)
-    problem = SVMProblem(Int32(size(X, 2)), pointer(idx),
-        pointer(nodeptrs))
+    problem = SVMProblem(Int32(size(X, 2)), pointer(idx), pointer(nodeptrs))
 
     # Validate the given parameters
     check_parameter(problem, param)
