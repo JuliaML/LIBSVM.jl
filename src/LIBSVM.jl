@@ -246,6 +246,8 @@ function set_num_threads!(nt::Integer)
         parse(Int64, get(ENV, "OMP_NUM_THREADS", "1"))
     elseif nt < 0
         libsvm_get_max_threads()
+    else
+        nt
     end
     libsvm_set_num_threads!(nt)
 end
