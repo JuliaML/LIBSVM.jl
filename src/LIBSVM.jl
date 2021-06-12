@@ -352,7 +352,13 @@ function svmtrain(
 
     libsvm_set_verbose(verbose)
 
-    ptr_model = libsvm_train(problem, param)
+    @GC.preserve nodes begin
+        # Validate the given parameters
+        libsvm_check_parameter(problem, param)
+
+        ptr_model = libsvm_train(problem, param)
+    end
+
     svm = SVM(unsafe_load(ptr_model), y, X, wts, reverse_labels, svmtype,
               kernel)
 
@@ -402,8 +408,10 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
              model.SVMtype == OneClassSVM        ? >(0)     :
              (x -> model.labels[round(Int, x)])
 
-    # create function barrier, since `pred` is type unstable
-    svmpredict_fill!(predf, decode, cmod, pred, decvalues, nodeptrs, nlabels)
+    @GC.preserve model nodes data begin
+        # create function barrier, since `pred` is type unstable
+        svmpredict_fill!(predf, decode, cmod, pred, decvalues, nodeptrs, nlabels)
+    end
 
     (pred, decvalues)
 end
