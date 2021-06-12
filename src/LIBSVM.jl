@@ -371,17 +371,17 @@ The method returns tuple `(predictions, decisionvalues)`.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if size(X,1) != model.nfeatures
-        error("Model has $(model.nfeatures) but $(size(X, 1)) provided")
+    if size(X, 1) != model.nfeatures
+        throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
     (nodes, nodeptrs) = instances2nodes(X)
 
-    if model.SVMtype == OneClassSVM
-        pred = BitArray(undef, ninstances)
+    pred = if model.SVMtype == OneClassSVM
+        BitArray(undef, ninstances)
     else
-        pred = Array{T}(undef, ninstances)
+        Array{T}(undef, ninstances)
     end
 
     nlabels = model.nclasses
@@ -397,24 +397,21 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
 
     cmod, data = svmmodel(model)
 
-    for i = 1:ninstances
-        if model.probability
-            output = libsvm_predict_probability(cmod, nodeptrs[i],
-                                                Ref(decvalues, nlabels*(i-1)+1))
-        else
-            output = libsvm_predict_values(cmod, nodeptrs[i],
-                                           Ref(decvalues, nlabels*(i-1)+1))
-        end
-        if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR
-            pred[i] = output
-        elseif model.SVMtype == OneClassSVM
-            pred[i] = output > 0
-        else
-            pred[i] = model.labels[round(Int,output)]
-        end
-    end
+    predf = ifelse(model.probability, libsvm_predict_probability, libsvm_predict_values)
+    decode = model.SVMtype ∈ (EpsilonSVR, NuSVR) ? identity :
+             model.SVMtype == OneClassSVM        ? >(0)     :
+             (x -> model.labels[round(Int, x)])
+
+    # create function barrier, since `pred` is type unstable
+    svmpredict_fill!(predf, decode, cmod, pred, decvalues, nodeptrs, nlabels)
 
     (pred, decvalues)
+end
+
+function svmpredict_fill!(predf, decode, cmod, pred, decvalues, nodeptrs, nlabels)
+    for i ∈ eachindex(pred)
+        @inbounds pred[i] = decode(predf(cmod, nodeptrs[i], Ref(decvalues, nlabels * (i - 1) + 1)))
+    end
 end
 
 include("ScikitLearnTypes.jl")

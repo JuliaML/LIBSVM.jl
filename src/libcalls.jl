@@ -33,16 +33,16 @@ function libsvm_free_model(model::Ptr{SVMModel})
           model)
 end
 
-function libsvm_predict_probability(model::SVMModel, nodes::Ptr{SVMNode},
-        decisions::Ref{Float64})
+function libsvm_predict_probability(model::SVMModel, node::Ptr{SVMNode},
+        decision::Ref{Cdouble})
     return ccall((:svm_predict_probability, libsvm), Cdouble,
-                 (Ref{SVMModel}, Ptr{SVMNode}, Ref{Float64}),
-                 model, node, decisions)
+                 (Ref{SVMModel}, Ptr{SVMNode}, Ref{Cdouble}),
+                 model, node, decision)
 end
 
-function libsvm_predict_values(model::SVMModel, nodes::Ptr{SVMNode},
-        decisions::Ref{Float64})
-    return ccall((:svm_predict_values, libsvm), Float64,
-                 (Ref{SVMModel}, Ptr{SVMNode}, Ref{Float64}),
-                 model, nodes, decisions)
+function libsvm_predict_values(model::SVMModel, node::Ptr{SVMNode},
+        decision::Ref{Cdouble})
+    return ccall((:svm_predict_values, libsvm), Cdouble,
+                 (Ref{SVMModel}, Ptr{SVMNode}, Ref{Cdouble}),
+                 model, node, decision)
 end

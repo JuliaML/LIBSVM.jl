@@ -8,7 +8,6 @@ using Test
 
 @testset "LibSVM" begin
 
-
 function test_iris_model(model, X, y)
     ans = Bool[
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -19,7 +18,6 @@ function test_iris_model(model, X, y)
     @test (ŷ .== y) == ans
     ŷ
 end
-
 
 @testset "libsvm version" begin
     @test LIBSVM.libsvm_version[] ≥ 322
@@ -46,6 +44,8 @@ end
         model = svmtrain(sparse(instances[:, 1:2:end]), labels[1:2:end]; verbose = true)
         test_iris_model(model, sparse(instances[:, 2:2:end]), labels[2:2:end])
     end
+
+    @test_throws DimensionMismatch svmpredict(model, rand(3, 42))
 end
 
 @testset "AbstractVector as labels" begin
