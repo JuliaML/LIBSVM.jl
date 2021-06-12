@@ -182,7 +182,7 @@ function instances2nodes(instances::AbstractMatrix{<:Real})
 
     for i=1:ninstances
         for j=1:nfeatures
-            nodes[j, i] = SVMNode(Int32(j-1), Float64(instances[j, i]))
+            nodes[j, i] = SVMNode(Int32(j), Float64(instances[j, i]))
         end
         nodes[end, i] = SVMNode(Int32(-1), NaN)
         nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
