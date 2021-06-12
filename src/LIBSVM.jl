@@ -154,7 +154,7 @@ const noprint_ptr = Ref{Ptr{Nothing}}(C_NULL)
 function __init__()
     libsvm_version[] = unsafe_load(cglobal((:libsvm_version, libsvm), Cint))
     noprint_ptr[] = @cfunction(noprint, Cvoid, (Ptr{UInt8},))
-    libsvm_set_verbose(false)
+    libsvm_set_verbose!(false)
 end
 
 
@@ -241,14 +241,13 @@ function indices_and_weights(labels::AbstractVector{T},
     (idx, reverse_labels, weights, weight_labels)
 end
 
-function set_num_threads(nt::Integer)
-    if nt == 0
-        nt = parse(Int64, get(ENV, "OMP_NUM_THREADS", "1"))
+function set_num_threads!(nt::Integer)
+    nt = if iszero(nt)
+        parse(Int64, get(ENV, "OMP_NUM_THREADS", "1"))
+    elseif nt < 0
+        libsvm_get_max_threads()
     end
-    if nt < 0
-        nt = libsvm_get_max_threads()
-    end
-    libsvm_set_num_threads(nt)
+    libsvm_set_num_threads!(nt)
 end
 
 """
@@ -315,7 +314,7 @@ function svmtrain(
         cachesize::Float64 = 200.0,
         verbose::Bool = false,
         nt::Integer = 1) where {T,U<:Real}
-    set_num_threads(nt)
+    set_num_threads!(nt)
 
     isempty(y) && (svmtype = OneClassSVM)
 
@@ -347,10 +346,7 @@ function svmtrain(
     (nodes, nodeptrs) = instances2nodes(X)
     problem = SVMProblem(Int32(size(X, 2)), pointer(idx), pointer(nodeptrs))
 
-    # Validate the given parameters
-    libsvm_check_parameter(problem, param)
-
-    libsvm_set_verbose(verbose)
+    libsvm_set_verbose!(verbose)
 
     @GC.preserve nodes begin
         # Validate the given parameters
@@ -375,7 +371,7 @@ The shape of `X` needs to be `(nfeatures, nsamples)`.
 The method returns tuple `(predictions, decisionvalues)`.
 """
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
-    set_num_threads(nt)
+    set_num_threads!(nt)
 
     if size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
@@ -392,14 +388,14 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
 
     nlabels = model.nclasses
 
-    if model.SVMtype == EpsilonSVR || model.SVMtype == NuSVR || model.SVMtype == OneClassSVM || model.probability
-        decvalues = zeros(Float64, nlabels, ninstances)
+    decvalues = if model.SVMtype ∈ (EpsilonSVR, NuSVR, OneClassSVM) || model.probability
+        zeros(Float64, nlabels, ninstances)
     else
         dcols = max(Int64(nlabels*(nlabels-1)/2), 2)
-        decvalues = zeros(Float64, dcols, ninstances)
+        zeros(Float64, dcols, ninstances)
     end
 
-    libsvm_set_verbose(false)
+    libsvm_set_verbose!(false)
 
     cmod, data = svmmodel(model)
 
