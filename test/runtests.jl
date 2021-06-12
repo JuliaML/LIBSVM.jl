@@ -245,6 +245,24 @@ end
 
         @test mean(y .== ỹ) > .99
     end
+
+    @testset "Sparse data" begin
+        X = sparse([0. 0.42 0.26 0. 0.90 0.08 0.53 0. 0.19;
+                    0. 0.65 0.32 0. 0.46 0.23 0.34 0. 0.33;
+                    0. 0.14 0.14 0. 0.67 0.41 0.77 0. 0.37;
+                    0. 0.24 0.49 0. 0.09 0.54 0.89 0. 0.20;
+                    0. 0.04 0.30 0. 0.96 0.39 0.62 0. 0.25])
+        y = [1, 1, 1, 1, 2, 2, 2, 2, 2]
+
+        K = X' * X
+
+        model  = svmtrain(K, y, kernel=Kernel.Precomputed)
+        model₂ = svmtrain(X, y, kernel=Kernel.Linear)
+
+        @test model.rho ≈ model₂.rho
+        @test model.coefs ≈ model₂.coefs
+        @test model.SVs.indices ≈ model₂.SVs.indices
+    end
 end
 
 end  # @testset "LIBSVM"
