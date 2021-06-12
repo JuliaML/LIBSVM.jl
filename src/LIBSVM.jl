@@ -148,13 +148,13 @@ function svmmodel(mod::SVM)
     return cmod, data
 end
 
-svmnoprint(str::Ptr{UInt8})::Cvoid = nothing
-
 const libsvm_version = Ref{Cint}(0)
+const noprint_ptr = Ref{Ptr{Nothing}}(C_NULL)
 
 function __init__()
-    libsvm_set_verbose(false)
     libsvm_version[] = unsafe_load(cglobal((:libsvm_version, libsvm), Cint))
+    noprint_ptr[] = @cfunction(noprint, Cvoid, (Ptr{UInt8},))
+    libsvm_set_verbose(false)
 end
 
 

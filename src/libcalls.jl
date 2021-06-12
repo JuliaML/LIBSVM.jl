@@ -1,15 +1,15 @@
 function libsvm_get_max_threads()
-    return ccall((:svm_get_max_threads, libsvm), Cint, ())
+    ccall((:svm_get_max_threads, libsvm), Cint, ())
 end
 
 function libsvm_set_num_threads(n::Integer)
     ccall((:svm_set_num_threads, libsvm), Cvoid, (Cint,), n)
 end
 
-noprint(str::Ptr{UInt8})::Cvoid = nothing
+noprint(::Ptr{UInt8})::Cvoid = nothing
 
 function libsvm_set_verbose(v::Bool)
-    f = ifelse(v, C_NULL, @cfunction(noprint, Cvoid, (Ptr{UInt8},)))
+    f = ifelse(v, C_NULL, noprint_ptr[])
     ccall((:svm_set_print_string_function, libsvm), Cvoid, (Ptr{Cvoid},), f)
 end
 
