@@ -401,13 +401,17 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
     decode = model.SVMtype ∈ (EpsilonSVR, NuSVR) ? identity :
              model.SVMtype == OneClassSVM        ? >(0)     :
              (x -> model.labels[round(Int, x)])
-    f = decode ∘ predf
 
-    for i ∈ Base.OneTo(ninstances)
-        pred[i] = f(cmod, nodeptrs[i], Ref(decvalues, nlabels * (i - 1) + 1))
-    end
+    # create function barrier, since `pred` is type unstable
+    svmpredict_fill!(predf, decode, cmod, pred, decvalues, nodeptrs, nlabels)
 
     (pred, decvalues)
+end
+
+function svmpredict_fill!(predf, decode, cmod, pred, decvalues, nodeptrs, nlabels)
+    for i ∈ eachindex(pred)
+        @inbounds pred[i] = decode(predf(cmod, nodeptrs[i], Ref(decvalues, nlabels * (i - 1) + 1)))
+    end
 end
 
 include("ScikitLearnTypes.jl")
