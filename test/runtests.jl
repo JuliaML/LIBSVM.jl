@@ -175,8 +175,8 @@ end
     @testset "Input matrix validation" begin
         nonsquare_mat = rand(5, 6)
         y = rand(Bool, size(nonsquare_mat, 1))
-        @test_throws DimensionMismatch svmtrain(nonsquare_mat, y,
-                                                kernel=Kernel.Precomputed)
+        @test_throws ArgumentError svmtrain(nonsquare_mat, y,
+                                            kernel=Kernel.Precomputed)
     end
 
     @testset "Trivial data" begin

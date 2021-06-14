@@ -2,6 +2,7 @@ module LIBSVM
 
 import LIBLINEAR
 
+using LinearAlgebra
 using SparseArrays
 using libsvm_jll
 
@@ -174,6 +175,31 @@ function grp2idx(::Type{S}, labels::AbstractVector,
     idx
 end
 
+gram2nodes(X::SparseMatrixCSC{<:Real}) = gram2nodes(Matrix(X))
+
+function gram2nodes(X::AbstractMatrix{<:Real})
+    # For training, n=l represents the number of instances
+    # For predictions, n is the number of instances to be predicted,
+    # while l is the number of training instances (some of which are
+    # the support vectors)
+    n, l = size(X)
+
+    nodeptrs = Array{Ptr{SVMNode}}(undef, n)
+    nodes = Array{SVMNode}(undef, l + 2, n)
+
+    for i in 1:n
+        # Instance index (this is required for precomputed kernel)
+        nodes[1, i] = SVMNode(0, i)
+        for j in 1:l
+            nodes[j + 1, i] = SVMNode(j, X[i, j])
+        end
+        nodes[end, i] = SVMNode(Float32(-1), NaN)
+        nodeptrs[i] = pointer(nodes, (i - 1) * (l + 2) + 1)
+    end
+
+    return (nodes, nodeptrs)
+end
+
 function instances2nodes(instances::AbstractMatrix{<:Real})
     nfeatures = size(instances, 1)
     ninstances = size(instances, 2)
@@ -243,11 +269,9 @@ function set_num_threads(nt::Integer)
     libsvm_set_num_threads(nt)
 end
 
-function check_dims(X, y, kernel)
-    if kernel == Kernel.Precomputed
-        if size(X, 1) != size(X, 2)
-            throw(DimensionMismatch("The input matrix must be square"))
-        end
+function check_train_input(X, y, kernel)
+    if kernel == Kernel.Precomputed && !issymmetric(X)
+        throw(ArgumentError("The input matrix must be symmetric"))
     end
 
     if size(y, 1) != size(X, 2)
@@ -340,7 +364,7 @@ function svmtrain(
         weights = Float64[]
         reverse_labels = Bool[]
     else
-        check_dims(X, y, kernel)
+        check_train_input(X, y, kernel)
         idx, reverse_labels, weights, weight_labels = indices_and_weights(y, X, weights)
     end
 
@@ -350,12 +374,15 @@ function svmtrain(
         pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
         Int32(probability))
 
+
     ninstances = size(X, 2)
 
     # Construct SVMProblem
     if kernel == Kernel.Precomputed
-        X = [1:size(X, 1) X]'
-        (nodes, nodeptrs) = instances2nodes(X)
+        (nodes, nodeptrs) = gram2nodes(X)
+
+        # This is necessary to construct SupportVectors
+        X = (1:size(X, 1))'
     else
         (nodes, nodeptrs) = instances2nodes(X)
     end
@@ -391,13 +418,14 @@ The method returns tuple `(predictions, decisionvalues)`.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if model.kernel != Kernel.Precomputed && size(X,1) != model.nfeatures
+    if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     if model.kernel == Kernel.Precomputed
         ninstances = size(X, 1)
-        (nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
+        #(nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
+        (nodes, nodeptrs) = gram2nodes(X)
     else
         ninstances = size(X, 2)
         (nodes, nodeptrs) = instances2nodes(X)

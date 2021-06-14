@@ -4,6 +4,7 @@ version = "0.6.0"
 
 [deps]
 LIBLINEAR = "2d691ee1-e668-5016-a719-b2531b85e0f5"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ScikitLearnBase = "6e75b9c4-186b-50bd-896f-2d2496a4843e"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 libsvm_jll = "08558c22-525a-5d2a-acf6-0ac6658ffce4"
