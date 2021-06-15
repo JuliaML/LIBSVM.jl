@@ -13,6 +13,7 @@ export svmtrain, svmpredict, fit!, predict, transform,
 include("LibSVMtypes.jl")
 include("constants.jl")
 include("libcalls.jl")
+include("nodes.jl")
 
 struct SupportVectors{T<:AbstractVector,U<:AbstractMatrix}
     l::Int32
@@ -173,94 +174,6 @@ function grp2idx(::Type{S}, labels::AbstractVector,
         end
     end
     idx
-end
-
-function fill_nodes!(nodes::AbstractMatrix{SVMNode},
-                     X::AbstractMatrix{<:Real})
-    # The last row will be filled with terminal nodes as required by
-    # SVMLIB
-    @assert size(nodes, 1) == size(X, 1) + 1
-    @assert size(nodes, 2) == size(X, 2)
-
-    nrows, ncols = size(X)
-
-    for i in 1:ncols
-        for j in 1:nrows
-            nodes[j, i] = SVMNode(j, X[j, i])
-        end
-        nodes[end, i] = SVMNode(-1, NaN)
-    end
-
-    return nodes
-end
-
-function node_pointers(nodes::AbstractMatrix{SVMNode})
-    nrows, ncols = size(nodes)
-    pointers = Array{Ptr{SVMNode}}(undef, ncols)
-
-    for i in 1:ncols
-        pointers[i] = pointer(nodes, (i - 1) * nrows + 1)
-    end
-
-    return pointers
-end
-
-gram2nodes(X::SparseMatrixCSC{<:Real}) = gram2nodes(Matrix(X))
-
-function gram2nodes(X::AbstractMatrix{<:Real})
-    # For training, n=l represents the number of training instances
-    # For prediction, n is the number of instances to be predicted,
-    # while l is the number of training instances (some of which are
-    # the support vectors)
-    l, n = size(X)
-
-    # One extra row for instance IDs and one for terminal nodes
-    # Instance IDs are required by LIBSVM
-    nodes = Array{SVMNode}(undef, l + 2, n)
-
-    # Create the nodes for instance IDs
-    for i in 1:n
-        nodes[1, i] = SVMNode(0, i)
-    end
-
-    fill_nodes!(@view(nodes[2:end, :]), X)
-
-    nodeptrs = node_pointers(nodes)
-
-    return nodes, nodeptrs
-end
-
-function instances2nodes(instances::AbstractMatrix{<:Real})
-    nfeatures, ninstances = size(instances)
-
-    nodes = Array{SVMNode}(undef, nfeatures + 1, ninstances)
-    fill_nodes!(nodes, instances)
-
-    nodeptrs = node_pointers(nodes)
-
-    return nodes, nodeptrs
-end
-
-function instances2nodes(instances::SparseMatrixCSC{<:Real})
-    ninstances = size(instances, 2)
-    nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
-    nodes = Array{SVMNode}(undef, nnz(instances)+ninstances)
-
-    j = 1
-    k = 1
-    for i=1:ninstances
-        nodeptrs[i] = pointer(nodes, k)
-        while j < instances.colptr[i+1]
-            val = instances.nzval[j]
-            nodes[k] = SVMNode(Int32(instances.rowval[j]), Float64(val))
-            k += 1
-            j += 1
-        end
-        nodes[k] = SVMNode(Int32(-1), NaN)
-        k += 1
-    end
-
-    (nodes, nodeptrs)
 end
 
 function indices_and_weights(labels::AbstractVector{T},
