@@ -175,46 +175,70 @@ function grp2idx(::Type{S}, labels::AbstractVector,
     idx
 end
 
+function fill_nodes!(nodes::AbstractMatrix{SVMNode},
+                     X::AbstractMatrix{<:Real})
+    # The last row will be filled with terminal nodes as required by
+    # SVMLIB
+    @assert size(nodes, 1) == size(X, 1) + 1
+    @assert size(nodes, 2) == size(X, 2)
+
+    nrows, ncols = size(X)
+
+    for i in 1:ncols
+        for j in 1:nrows
+            nodes[j, i] = SVMNode(j, X[j, i])
+        end
+        nodes[end, i] = SVMNode(-1, NaN)
+    end
+
+    return nodes
+end
+
+function node_pointers(nodes::AbstractMatrix{SVMNode})
+    nrows, ncols = size(nodes)
+    pointers = Array{Ptr{SVMNode}}(undef, ncols)
+
+    for i in 1:ncols
+        pointers[i] = pointer(nodes, (i - 1) * nrows + 1)
+    end
+
+    return pointers
+end
+
 gram2nodes(X::SparseMatrixCSC{<:Real}) = gram2nodes(Matrix(X))
 
 function gram2nodes(X::AbstractMatrix{<:Real})
-    # For training, n=l represents the number of instances
-    # For predictions, n is the number of instances to be predicted,
+    # For training, n=l represents the number of training instances
+    # For prediction, n is the number of instances to be predicted,
     # while l is the number of training instances (some of which are
     # the support vectors)
-    n, l = size(X)
+    l, n = size(X)
 
-    nodeptrs = Array{Ptr{SVMNode}}(undef, n)
+    # One extra row for instance IDs and one for terminal nodes
+    # Instance IDs are required by LIBSVM
     nodes = Array{SVMNode}(undef, l + 2, n)
 
+    # Create the nodes for instance IDs
     for i in 1:n
-        # Instance index (this is required for precomputed kernel)
         nodes[1, i] = SVMNode(0, i)
-        for j in 1:l
-            nodes[j + 1, i] = SVMNode(j, X[i, j])
-        end
-        nodes[end, i] = SVMNode(Float32(-1), NaN)
-        nodeptrs[i] = pointer(nodes, (i - 1) * (l + 2) + 1)
     end
 
-    return (nodes, nodeptrs)
+    fill_nodes!(@view(nodes[2:end, :]), X)
+
+    nodeptrs = node_pointers(nodes)
+
+    return nodes, nodeptrs
 end
 
 function instances2nodes(instances::AbstractMatrix{<:Real})
-    nfeatures = size(instances, 1)
-    ninstances = size(instances, 2)
-    nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
+    nfeatures, ninstances = size(instances)
+
     nodes = Array{SVMNode}(undef, nfeatures + 1, ninstances)
+    fill_nodes!(nodes, instances)
 
-    for i=1:ninstances
-        for j=1:nfeatures
-            nodes[j, i] = SVMNode(Int32(j), Float64(instances[j, i]))
-        end
-        nodes[end, i] = SVMNode(Int32(-1), NaN)
-        nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
-    end
+    nodeptrs = node_pointers(nodes)
 
-    (nodes, nodeptrs)
+    return nodes, nodeptrs
 end
 
 function instances2nodes(instances::SparseMatrixCSC{<:Real})
@@ -422,12 +446,11 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
+    ninstances = size(X, 2)
     if model.kernel == Kernel.Precomputed
-        ninstances = size(X, 1)
         #(nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
         (nodes, nodeptrs) = gram2nodes(X)
     else
-        ninstances = size(X, 2)
         (nodes, nodeptrs) = instances2nodes(X)
     end
 
