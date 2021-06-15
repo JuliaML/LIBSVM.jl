@@ -238,7 +238,8 @@ end
     ) where {T,U<:Real}
 
 Train Support Vector Machine using LIBSVM using response vector `y`
-and training data `X`. The shape of `X` needs to be `(nfeatures, nsamples)`.
+and training data `X`. The shape of `X` needs to be `(nfeatures, nsamples)` or
+`(nsamples, nsamples)` in the case of precomputed kernel (see below).
 For one-class SVM use only `X`.
 
 # Arguments
@@ -264,6 +265,14 @@ For one-class SVM use only `X`.
 
 Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
+
+# Precomputed kernel
+
+In the case of precomputed kernel, the input matrix `X` should be a
+(symmetric) matrix of shape `(n, n)` where column `i` contains values
+`[K(x_i, x_1), K(x_i, x_2), ..., K(x_i, x_n)]`. For example, if matrix
+`M` contains instances in its columns, then `M' * M` produces the correct
+input matrix `X` for linear kernel.
 """
 function svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
@@ -311,14 +320,14 @@ function svmtrain(
         pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
         Int32(probability))
 
-
     ninstances = size(X, 2)
 
     # Construct SVMProblem
     if kernel == Kernel.Precomputed
         (nodes, nodeptrs) = gram2nodes(X)
 
-        # This is necessary to construct SupportVectors
+        # This is necessary to construct SupportVectors correctly
+        # The struct needs to contain the indices of support vectors
         X = (1:size(X, 1))'
     else
         (nodes, nodeptrs) = instances2nodes(X)
@@ -349,8 +358,19 @@ end
     svmpredict(model::SVM{T}, X::AbstractMatrix{U}) where {T,U<:Real}
 
 Predict values using `model` based on data `X`.
-The shape of `X` needs to be `(nfeatures, nsamples)`.
+The shape of `X` needs to be `(nfeatures, nsamples)` (for precomputed kernel
+see below).
 The method returns tuple `(predictions, decisionvalues)`.
+
+# Precomputed kernel
+
+In the case of precomputed kernel, the input matrix `X` should be of shape `(l,
+n)`, where `l` is the number of training instances and `n` is the number of
+testing instances. Column `i` of `X` should contain values `[K(t_i, x_1),
+K(t_i, x_2), ..., K(t_i, x_l)]`, where `t_i` is `i`-th testing instance and
+`x_j` is `j`-th training instance. For linear kernel, `M' * T` produces the
+correct matrix, where columns of `M` contain the training instances and columns
+of `T` the testing instances.
 """
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
@@ -361,7 +381,6 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
 
     ninstances = size(X, 2)
     if model.kernel == Kernel.Precomputed
-        #(nodes, nodeptrs) = instances2nodes([1:size(X, 1) X]')
         (nodes, nodeptrs) = gram2nodes(X)
     else
         (nodes, nodeptrs) = instances2nodes(X)
