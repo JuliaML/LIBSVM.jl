@@ -299,6 +299,7 @@ function svmtrain(
     wts = weights
 
     if svmtype ∈ (EpsilonSVR, NuSVR)
+        check_train_input(X, y, kernel)
         idx = y
         weight_labels = Int32[]
         weights = Float64[]
