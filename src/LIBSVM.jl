@@ -2,7 +2,7 @@ module LIBSVM
 
 import LIBLINEAR
 
-using SparseArrays
+using LinearAlgebra
 using libsvm_jll
 
 export svmtrain, svmpredict, fit!, predict, transform,
@@ -12,6 +12,7 @@ export svmtrain, svmpredict, fit!, predict, transform,
 include("LibSVMtypes.jl")
 include("constants.jl")
 include("libcalls.jl")
+include("nodes.jl")
 
 struct SupportVectors{T<:AbstractVector,U<:AbstractMatrix}
     l::Int32
@@ -174,59 +175,12 @@ function grp2idx(::Type{S}, labels::AbstractVector,
     idx
 end
 
-function instances2nodes(instances::AbstractMatrix{<:Real})
-    nfeatures = size(instances, 1)
-    ninstances = size(instances, 2)
-    nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
-    nodes = Array{SVMNode}(undef, nfeatures + 1, ninstances)
-
-    for i=1:ninstances
-        for j=1:nfeatures
-            nodes[j, i] = SVMNode(Int32(j), Float64(instances[j, i]))
-        end
-        nodes[end, i] = SVMNode(Int32(-1), NaN)
-        nodeptrs[i] = pointer(nodes, (i-1)*(nfeatures+1)+1)
-    end
-
-    (nodes, nodeptrs)
-end
-
-function instances2nodes(instances::SparseMatrixCSC{<:Real})
-    ninstances = size(instances, 2)
-    nodeptrs = Array{Ptr{SVMNode}}(undef, ninstances)
-    nodes = Array{SVMNode}(undef, nnz(instances)+ninstances)
-
-    j = 1
-    k = 1
-    for i=1:ninstances
-        nodeptrs[i] = pointer(nodes, k)
-        while j < instances.colptr[i+1]
-            val = instances.nzval[j]
-            nodes[k] = SVMNode(Int32(instances.rowval[j]), Float64(val))
-            k += 1
-            j += 1
-        end
-        nodes[k] = SVMNode(Int32(-1), NaN)
-        k += 1
-    end
-
-    (nodes, nodeptrs)
-end
-
-
 function indices_and_weights(labels::AbstractVector{T},
         instances::AbstractMatrix{U},
         weights::Union{Dict{T, Float64}, Cvoid}=nothing) where {T, U<:Real}
     label_dict = Dict{T, Int32}()
     reverse_labels = Array{T}(undef, 0)
     idx = grp2idx(Float64, labels, label_dict, reverse_labels)
-
-
-    if length(labels) != size(instances, 2)
-        error("""Size of second dimension of training instance matrix
-        ($(size(instances, 2))) does not match length of labels
-        ($(length(labels)))""")
-    end
 
     # Construct SVMParameter
     if weights == nothing || length(weights) == 0
@@ -251,6 +205,18 @@ function set_num_threads(nt::Integer)
     libsvm_set_num_threads(nt)
 end
 
+function check_train_input(X, y, kernel)
+    if kernel == Kernel.Precomputed && !issymmetric(X)
+        throw(ArgumentError("The input matrix must be symmetric"))
+    end
+
+    if size(y, 1) != size(X, 2)
+        throw(DimensionMismatch("Size of second dimension of training instance
+                                matrix ($(size(X, 2))) does not match length of
+                                labels ($(size(y, 1)))"))
+    end
+end
+
 """
     svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
@@ -271,7 +237,8 @@ end
     ) where {T,U<:Real}
 
 Train Support Vector Machine using LIBSVM using response vector `y`
-and training data `X`. The shape of `X` needs to be `(nfeatures, nsamples)`.
+and training data `X`. The shape of `X` needs to be `(nfeatures, nsamples)` or
+`(nsamples, nsamples)` in the case of precomputed kernel (see below).
 For one-class SVM use only `X`.
 
 # Arguments
@@ -297,6 +264,14 @@ For one-class SVM use only `X`.
 
 Consult LIBSVM documentation for advice on the choise of correct
 parameters and model tuning.
+
+# Precomputed kernel
+
+In the case of precomputed kernel, the input matrix `X` should be a
+(symmetric) matrix of shape `(n, n)` where column `i` contains values
+`[K(x_i, x_1), K(x_i, x_2), ..., K(x_i, x_n)]`. For example, if matrix
+`M` contains instances in its columns, then `M' * M` produces the correct
+input matrix `X` for linear kernel.
 """
 function svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
@@ -324,6 +299,7 @@ function svmtrain(
     wts = weights
 
     if svmtype ∈ (EpsilonSVR, NuSVR)
+        check_train_input(X, y, kernel)
         idx = y
         weight_labels = Int32[]
         weights = Float64[]
@@ -334,6 +310,7 @@ function svmtrain(
         weights = Float64[]
         reverse_labels = Bool[]
     else
+        check_train_input(X, y, kernel)
         idx, reverse_labels, weights, weight_labels = indices_and_weights(y, X, weights)
     end
 
@@ -343,9 +320,19 @@ function svmtrain(
         pointer(weight_labels), pointer(weights), nu, epsilon, Int32(shrinking),
         Int32(probability))
 
+    ninstances = size(X, 2)
+
     # Construct SVMProblem
-    (nodes, nodeptrs) = instances2nodes(X)
-    problem = SVMProblem(Int32(size(X, 2)), pointer(idx), pointer(nodeptrs))
+    if kernel == Kernel.Precomputed
+        (nodes, nodeptrs) = gram2nodes(X)
+
+        # This is necessary to construct SupportVectors correctly
+        # The struct needs to contain the indices of support vectors
+        X = (1:size(X, 1))'
+    else
+        (nodes, nodeptrs) = instances2nodes(X)
+    end
+    problem = SVMProblem(Int32(ninstances), pointer(idx), pointer(nodeptrs))
 
     # Validate the given parameters
     libsvm_check_parameter(problem, param)
@@ -371,18 +358,33 @@ end
     svmpredict(model::SVM{T}, X::AbstractMatrix{U}) where {T,U<:Real}
 
 Predict values using `model` based on data `X`.
-The shape of `X` needs to be `(nfeatures, nsamples)`.
+The shape of `X` needs to be `(nfeatures, nsamples)` (for precomputed kernel
+see below).
 The method returns tuple `(predictions, decisionvalues)`.
+
+# Precomputed kernel
+
+In the case of precomputed kernel, the input matrix `X` should be of shape `(l,
+n)`, where `l` is the number of training instances and `n` is the number of
+testing instances. Column `i` of `X` should contain values `[K(t_i, x_1),
+K(t_i, x_2), ..., K(t_i, x_l)]`, where `t_i` is `i`-th testing instance and
+`x_j` is `j`-th training instance. For linear kernel, `M' * T` produces the
+correct matrix, where columns of `M` contain the training instances and columns
+of `T` the testing instances.
 """
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if size(X, 1) != model.nfeatures
+    if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
-    (nodes, nodeptrs) = instances2nodes(X)
+    if model.kernel == Kernel.Precomputed
+        (nodes, nodeptrs) = gram2nodes(X)
+    else
+        (nodes, nodeptrs) = instances2nodes(X)
+    end
 
     pred = if model.SVMtype == OneClassSVM
         BitArray(undef, ninstances)
