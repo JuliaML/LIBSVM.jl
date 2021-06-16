@@ -3,7 +3,6 @@ module LIBSVM
 import LIBLINEAR
 
 using LinearAlgebra
-using SparseArrays
 using libsvm_jll
 
 export svmtrain, svmpredict, fit!, predict, transform,
