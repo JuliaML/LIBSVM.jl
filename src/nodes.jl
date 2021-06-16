@@ -1,5 +1,7 @@
 using SparseArrays
 
+const terminator = SVMNode(-1, NaN)
+
 function node_pointers(nodes::AbstractMatrix{SVMNode})
     nrows, ncols = size(nodes)
     pointers = Array{Ptr{SVMNode}}(undef, ncols)
@@ -24,7 +26,7 @@ function fill_nodes!(nodes::AbstractMatrix{SVMNode},
         for j in 1:nrows
             nodes[j, i] = SVMNode(j, X[j, i])
         end
-        nodes[end, i] = SVMNode(-1, NaN)
+        nodes[end, i] = terminator
     end
 
     return nodes
@@ -87,7 +89,7 @@ function instances2nodes(instances::SparseMatrixCSC{<:Real})
             nodes[k] = SVMNode(rows[j], vals[j])
             k += 1
         end
-        nodes[k] = SVMNode(-1, NaN)
+        nodes[k] = terminator
         k += 1
     end
 
