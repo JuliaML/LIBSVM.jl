@@ -334,9 +334,6 @@ function svmtrain(
     end
     problem = SVMProblem(Int32(ninstances), pointer(idx), pointer(nodeptrs))
 
-    # Validate the given parameters
-    libsvm_check_parameter(problem, param)
-
     libsvm_set_verbose(verbose)
 
     @GC.preserve nodes begin
