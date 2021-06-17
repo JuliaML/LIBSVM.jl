@@ -51,6 +51,53 @@ model = svmtrain(Xtrain, ytrain)
 @printf "Accuracy: %.2f%%\n" mean(ŷ .== ytest) * 100
 ```
 
+### Precomputed kernel
+
+It is possible to use different kernels than those that are provided. In such a
+case, it is required to provide a matrix filled with precomputed kernel values.
+
+For training, a symmetric matrix is expected:
+```
+K = [k(x_1, x_1)  k(x_1, x_2)  ...  k(x_1, x_l);
+     k(x_2, x_1)
+         ...                            ...
+     k(x_l, x_1)        ...         k(x_l, x_l)]
+```
+where `x_i` is `i`-th training instance and `l` is the number of training
+instances.
+
+To predict `n` instances, a matrix of shape `(l, n)` is expected:
+```
+KK = [k(x_1, t_1)  k(x_1, t_2)  ...  k(x_1, t_n);
+      k(x_2, t_1)
+          ...                            ...
+      k(x_l, t_1)        ...         k(x_l, t_n)]
+```
+where `t_i` is `i`-th instance to be predicted.
+
+#### Example
+
+```julia
+# Training data
+X = [-2 -1 -1 1 1 2;
+     -1 -1 -2 1 2 1]
+y = [1, 1, 1, 2, 2, 2]
+
+# Testing data
+T = [-1 2 3;
+     -1 2 2]
+
+# Precomputed matrix for training (corresponds to linear kernel)
+K = X' * X
+
+model = svmtrain(K, y, kernel=Kernel.Precomputed)
+
+# Precomputed matrix for prediction
+KK = X' * T
+
+ỹ, _ = svmpredict(model, KK)
+```
+
 ### ScikitLearn API
 
 You can alternatively use `ScikitLearn.jl` API with same options as `svmtrain`:
