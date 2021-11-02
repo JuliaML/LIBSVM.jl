@@ -271,6 +271,65 @@ end
         @test model.coefs ≈ model₂.coefs
         @test model.SVs.indices ≈ model₂.SVs.indices
     end
+
+    @testset "Malformed prediction" begin
+        X = [-2 -1 -1 1 1 2;
+            -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        T = [-1 2 3;
+            -1 2 2]
+
+        K = X' * X
+
+        model = svmtrain(K, y, kernel=Kernel.Precomputed)
+
+        KK = X' * T
+
+        KK_malformed = KK[1:1,:]
+
+        @test_throws DimensionMismatch svmpredict(model, KK_malformed)
+    end
+
+    @testset "Full gram matrix" begin
+        X = [-2 -1 -1 1 1 2;
+            -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        T = [-1 2 3;
+            -1 2 2]
+
+        ŷ = [1, 2, 2]
+
+        K = X' * X
+
+        model = svmtrain(K, y, kernel=Kernel.Precomputed)
+
+        KK = X' * T
+
+        ỹ, _ = svmpredict(model, KK)
+        @test ỹ == [1, 2, 2]
+    end
+
+    @testset "Sparse gram matrix" begin
+        X = [-2 -1 -1 1 1 2;
+            -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        T = [-1 2 3;
+            -1 2 2]
+
+        ŷ = [1, 2, 2]
+
+        K = X' * X
+
+        model = svmtrain(K, y, kernel=Kernel.Precomputed)
+
+        KK = X[:, model.SVs.indices]' * T
+
+        ỹ, _ = svmpredict(model, KK)
+        @test ỹ == [1, 2, 2]
+    end
 end
 
 end  # @testset "LIBSVM"
