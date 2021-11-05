@@ -191,7 +191,7 @@ end
         @test model.rho ≈ [0]
         @test model.coefs ≈ [0.25; -0.25]
         @test model.SVs.indices == [2, 4]
-
+        
         ỹ, _ = svmpredict(model, K)
 
         @test y == ỹ
@@ -270,6 +270,73 @@ end
         @test model.rho ≈ model₂.rho
         @test model.coefs ≈ model₂.coefs
         @test model.SVs.indices ≈ model₂.SVs.indices
+    end
+end
+
+
+@testset "Callable kernel" begin
+    @testset "Trivial data" begin
+        X = [-2 -1 -1 1 1 2;
+             -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        kernel(x1, x2) = x1' * x2
+
+        model = svmtrain(X, y, kernel=kernel)
+
+        @test model.rho ≈ [0]
+        @test model.coefs ≈ [0.25; -0.25]
+        @test model.SVs.indices == [2, 4]
+
+        ỹ, _ = svmpredict(model, X)
+
+        @test y == ỹ
+
+        T = [-1 2 3;
+             -1 2 2]
+
+        ỹ, _ = svmpredict(model, T)
+        @test [1, 2, 2] == ỹ
+    end
+
+    @testset "Iris data" begin
+        X, y = load_iris()
+
+        kernel(x1, x2) = x1' * x2
+
+        model  = svmtrain(X, y, kernel=kernel)
+        model₂ = svmtrain(X, y, kernel=Kernel.Linear)
+
+        @test model.rho ≈ model₂.rho
+        @test model.coefs ≈ model₂.coefs
+        @test model.SVs.indices ≈ model₂.SVs.indices
+
+        ỹ, _  = svmpredict(model, X)
+
+        @test mean(y .== ỹ) > .99
+    end
+
+    @testset "Circle data" begin
+        distance(x) = x[1]^2 + x[2]^2
+
+        X = [0.72  0.68  0.28  0.75  0.47  0.26  0.95  0.0   0.95  0.39;
+            0.49  0.07  0.67  0.94  0.4   0.98  0.21  0.29  0.91  0.16]
+        
+        y = 0.5 .< [distance(x) for x in eachcol(X)]
+
+        kernel(x1, x2) = x1' * x2 + distance(x1) * distance(x2)
+
+        model  = svmtrain(X, y, kernel=kernel)
+        ỹ, _ = svmpredict(model, X)
+        @test y == ỹ
+
+        T = [0.57  0.56  0.57  0.51;
+            0.9   0.37  0.04  0.76]
+        
+        ŷ = 0.5 .< [distance(x) for x in eachcol(T)]
+        ỹ, _  = svmpredict(model, T)
+
+        @test ŷ == ỹ
     end
 end
 
