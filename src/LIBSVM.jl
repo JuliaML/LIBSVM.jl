@@ -42,7 +42,7 @@ end
 
 struct SVM{T}
     SVMtype::Type
-    kernel::Kernel.KERNEL
+    kernel::Union{Kernel.KERNEL, Function}
     weights::Union{Dict{T,Float64},Cvoid}
     nfeatures::Int
     nclasses::Int32
@@ -106,7 +106,15 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
         unsafe_copyto!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
-    SVM(svmtype, kernel, weights, size(X,1),
+    if kernel == Kernel.Precomputed || isa(kernel, Function)
+        # in the precomputed case, each data point we want to predict has
+        # l gram matrix entries (≈ features), where l is the number of training vectors.
+        nfeatures = size(X, 2)
+    else
+        nfeatures = size(X,1)
+    end
+
+    SVM(svmtype, kernel, weights, nfeatures,
         smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
         svs, smc.param.coef0, coefs, probA, probB,
         rho, smc.param.degree,
@@ -125,7 +133,11 @@ end
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
     svm_type = Int32(SVMTYPES[mod.SVMtype])
-    kernel = Int32(mod.kernel)
+    if isa(mod.kernel, Function)
+       kernel = Int32(Kernel.Precomputed) 
+    else
+        kernel = Int32(mod.kernel)
+    end
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
                         mod.coef0, mod.cache_size, mod.tolerance, mod.cost,
@@ -138,7 +150,12 @@ function svmmodel(mod::SVM)
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
 
-    nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
+    if isa(mod.kernel, Function) || mod.kernel == Kernel.Precomputed
+        # This is necessary to construct SupportVectors correctly
+        nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.indices')
+    else
+        nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
+    end
     data = SVMData(sv_coef, nodes, ptrs)
 
     cmod = SVMModel(param, mod.nclasses, mod.SVs.l, pointer(data.nodeptrs), pointer(data.coefs),
@@ -206,7 +223,10 @@ function set_num_threads(nt::Integer)
 end
 
 function check_train_input(X, y, kernel)
-    if kernel == Kernel.Precomputed && !issymmetric(X)
+    if isa(kernel, Function)
+        # TODO: Should we check whether `kernel` is a valid kernel function?
+        # if yes, check for what?
+    elseif kernel == Kernel.Precomputed && !issymmetric(X)
         throw(ArgumentError("The input matrix must be symmetric"))
     end
 
@@ -216,6 +236,38 @@ function check_train_input(X, y, kernel)
                                 labels ($(size(y, 1)))"))
     end
 end
+
+function data2gram(kernel_function::Function, X)
+    n1 = axes(X, 2)
+    gram = Array{Float64}(undef, n1.stop, n1.stop)
+    for i in n1
+        for j in 1:i
+            if i==j
+                gram[i,i] = kernel_function(X[:,i], X[:,i])
+            else
+                interm = kernel_function(X[:, i], X[:, j])
+                gram[i,j] = interm
+                gram[j,i] = interm
+            end
+        end
+    end
+    return gram
+end
+
+
+function data2gram(kernel::Function, T, SVs::SupportVectors, nfeatures::Int)
+    n2 = axes(T, 2) # number of datapoints to predict
+    gram = zeros(nfeatures, size(T, 2))
+
+    for (i, idx) in enumerate(SVs.indices)
+        for j in n2
+            x = SVs.X[:, i]
+            gram[idx,j] = kernel(x, T[:,j])
+        end
+    end
+    return gram
+end
+
 
 """
     svmtrain(
@@ -276,7 +328,7 @@ input matrix `X` for linear kernel.
 function svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         svmtype::Type = SVC,
-        kernel::Kernel.KERNEL = Kernel.RadialBasis,
+        kernel::Union{Kernel.KERNEL, Function} = Kernel.RadialBasis,
         degree::Integer = 3,
         gamma::Float64 = 1.0 / size(X, 1),
         coef0::Float64 = 0.0,
@@ -295,7 +347,13 @@ function svmtrain(
     isempty(y) && (svmtype = OneClassSVM)
 
     _svmtype = SVMTYPES[svmtype]
-    _kernel = Int32(kernel)
+
+    if isa(kernel, Function)
+        _kernel = Int32(Kernel.Precomputed)
+    else
+        _kernel = Int32(kernel)
+    end
+
     wts = weights
 
     if svmtype ∈ (EpsilonSVR, NuSVR)
@@ -323,14 +381,15 @@ function svmtrain(
     ninstances = size(X, 2)
 
     # Construct SVMProblem
-    if kernel == Kernel.Precomputed
-        (nodes, nodeptrs) = gram2nodes(X)
-
-        # This is necessary to construct SupportVectors correctly
-        # The struct needs to contain the indices of support vectors
-        X = (1:size(X, 1))'
+    if isa(kernel, Function)
+        gram = data2gram(kernel, X)
+        (nodes, nodeptrs) = gram2nodes(gram)
     else
-        (nodes, nodeptrs) = instances2nodes(X)
+        if kernel == Kernel.Precomputed
+            (nodes, nodeptrs) = gram2nodes(X)
+        else
+            (nodes, nodeptrs) = instances2nodes(X)
+        end
     end
     problem = SVMProblem(Int32(ninstances), pointer(idx), pointer(nodeptrs))
 
@@ -372,12 +431,15 @@ of `T` the testing instances.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
+    if model.kernel != Kernel.Precomputed && !isa(model.kernel, Function) && size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
-    if model.kernel == Kernel.Precomputed
+    if isa(model.kernel, Function)
+        gram = data2gram(model.kernel, X, model.SVs, model.nfeatures)
+        (nodes, nodeptrs) = gram2nodes(gram)
+    elseif model.kernel == Kernel.Precomputed
         (nodes, nodeptrs) = gram2nodes(X)
     else
         (nodes, nodeptrs) = instances2nodes(X)
