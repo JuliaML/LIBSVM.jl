@@ -40,9 +40,9 @@ function SupportVectors(smc::SVMModel, y, X)
     SupportVectors(smc.l, nSV, yi , X[:,sv_indices], sv_indices, nodes)
 end
 
-struct SVM{T}
+struct SVM{T, K}
     SVMtype::Type
-    kernel::Union{Kernel.KERNEL, Function}
+    kernel::K
     weights::Union{Dict{T,Float64},Cvoid}
     nfeatures::Int
     nclasses::Int32
