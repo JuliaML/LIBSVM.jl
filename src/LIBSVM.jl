@@ -381,7 +381,7 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
     if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) features but $(size(X, 1)) provided"))
     elseif model.kernel == Kernel.Precomputed && size(X, 1) != model.nfeatures
-            throw(DimensionMismatch("Gram matrix should either have $(model.nfeatures) or $(sum(model.SVs.nSV)) features but $(size(X, 1)) provided"))
+            throw(DimensionMismatch("Gram matrix should have $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
