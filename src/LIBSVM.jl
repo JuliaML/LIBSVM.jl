@@ -223,10 +223,7 @@ function set_num_threads(nt::Integer)
 end
 
 function check_train_input(X, y, kernel)
-    if isa(kernel, Function)
-        # TODO: Should we check whether `kernel` is a valid kernel function?
-        # if yes, check for what?
-    elseif kernel == Kernel.Precomputed && !issymmetric(X)
+    if kernel == Kernel.Precomputed && !issymmetric(X)
         throw(ArgumentError("The input matrix must be symmetric"))
     end
 
