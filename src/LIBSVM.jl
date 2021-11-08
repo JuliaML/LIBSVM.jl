@@ -106,7 +106,7 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
         unsafe_copyto!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
-    if kernel == Kernel.Precomputed || isa(kernel, Function)
+    if kernel == Kernel.Precomputed || !isa(kernel, Kernel.KERNEL)
         # in the precomputed case, each data point we want to predict has
         # l gram matrix entries (≈ features), where l is the number of training vectors.
         nfeatures = size(X, 2)
@@ -133,10 +133,10 @@ end
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
     svm_type = Int32(SVMTYPES[mod.SVMtype])
-    if isa(mod.kernel, Function)
-       kernel = Int32(Kernel.Precomputed) 
-    else
+    if isa(mod.kernel, Kernel.KERNEL)
         kernel = Int32(mod.kernel)
+    else
+        kernel = Int32(Kernel.Precomputed)
     end
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
@@ -150,7 +150,7 @@ function svmmodel(mod::SVM)
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
 
-    if isa(mod.kernel, Function) || mod.kernel == Kernel.Precomputed
+    if !isa(mod.kernel, Kernel.KERNEL) || mod.kernel == Kernel.Precomputed
         # This is necessary to construct SupportVectors correctly
         nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.indices')
     else
@@ -345,10 +345,10 @@ function svmtrain(
 
     _svmtype = SVMTYPES[svmtype]
 
-    if isa(kernel, Function)
-        _kernel = Int32(Kernel.Precomputed)
-    else
+    if isa(kernel, Kernel.KERNEL)
         _kernel = Int32(kernel)
+    else
+        _kernel = Int32(Kernel.Precomputed)
     end
 
     wts = weights
@@ -378,7 +378,7 @@ function svmtrain(
     ninstances = size(X, 2)
 
     # Construct SVMProblem
-    if isa(kernel, Function)
+    if !isa(kernel, Kernel.KERNEL)
         gram = data2gram(kernel, X)
         (nodes, nodeptrs) = gram2nodes(gram)
     else
@@ -428,12 +428,13 @@ of `T` the testing instances.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if model.kernel != Kernel.Precomputed && !isa(model.kernel, Function) && size(X, 1) != model.nfeatures
+    if model.kernel != Kernel.Precomputed && isa(model.kernel, Kernel.KERNEL) && size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
-    if isa(model.kernel, Function)
+
+    if !isa(model.kernel, Kernel.KERNEL)
         gram = data2gram(model.kernel, X, model.SVs, model.nfeatures)
         (nodes, nodeptrs) = gram2nodes(gram)
     elseif model.kernel == Kernel.Precomputed
