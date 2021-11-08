@@ -374,22 +374,14 @@ K(t_i, x_2), ..., K(t_i, x_l)]`, where `t_i` is `i`-th testing instance and
 `x_j` is `j`-th training instance. For linear kernel, `M' * T` produces the
 correct matrix, where columns of `M` contain the training instances and columns
 of `T` the testing instances.
-Alternatively a shape of `(k, n)` is also accepted, where `k` is the number of
-support vectors of the model. The order should be the same as in `model.SVs.indices`.
 """
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
     if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) features but $(size(X, 1)) provided"))
-    elseif model.kernel == Kernel.Precomputed
-        if size(X, 1) == sum(model.SVs.nSV)
-            X_sparse = copy(X)
-            X = similar(X_sparse, model.nfeatures, size(X, 2))
-            X[model.SVs.indices, :] = X_sparse
-        elseif size(X, 1) != model.nfeatures
+    elseif model.kernel == Kernel.Precomputed && size(X, 1) != model.nfeatures
             throw(DimensionMismatch("Gram matrix should either have $(model.nfeatures) or $(sum(model.SVs.nSV)) features but $(size(X, 1)) provided"))
-        end
     end
 
     ninstances = size(X, 2)
