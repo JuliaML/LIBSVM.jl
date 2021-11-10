@@ -109,7 +109,7 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
     if kernel == Kernel.Precomputed
         nfeatures = size(X, 2)
     else
-        nfeatures = size(X,1)
+        nfeatures = size(X, 1)
     end
 
     SVM(svmtype, kernel, weights, nfeatures,
