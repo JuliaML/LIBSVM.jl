@@ -358,6 +358,40 @@ end
 
         @test ŷ == ỹ
     end
+
+    @testset "Non-function callable" begin
+        distance(x) = x[1]^2 + x[2]^2
+
+        struct CallableStruct
+            a0::Float64
+            a1::Float64
+            a2::Float64
+        end
+
+        function (p::CallableStruct)(x1, x2)
+            return p.a0 + p.a1 * x1' * x2 + p.a2 * distance(x1) * distance(x2)
+        end
+
+        kernel = CallableStruct(0, 1, 1)
+
+        X = [0.72  0.68  0.28  0.75  0.47  0.26  0.95  0.0   0.95  0.39;
+            0.49  0.07  0.67  0.94  0.4   0.98  0.21  0.29  0.91  0.16]
+        y = 0.5 .< [distance(x) for x in eachcol(X)]
+
+        @test !isa(kernel, Function)
+
+        model  = svmtrain(X, y, kernel=kernel)
+        ỹ, _ = svmpredict(model, X)
+        @test y == ỹ
+
+        T = [0.57  0.56  0.57  0.51;
+            0.9   0.37  0.04  0.76]
+
+        ŷ = 0.5 .< [distance(x) for x in eachcol(T)]
+        ỹ, _  = svmpredict(model, T)
+
+        @test ŷ == ỹ
+    end
 end
 
 end  # @testset "LIBSVM"
