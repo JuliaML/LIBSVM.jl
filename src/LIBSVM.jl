@@ -228,7 +228,7 @@ function check_train_input(X, y, kernel)
     end
 end
 
-function data2gram(kernel_function::Function, X)
+function data2gram(kernel_function, X)
     n1 = axes(X, 2)
     gram = Array{Float64}(undef, n1.stop, n1.stop)
     for i in n1
@@ -244,7 +244,7 @@ function data2gram(kernel_function::Function, X)
 end
 
 
-function data2gram(kernel::Function, T, SVs::SupportVectors, ntrain::Int)
+function data2gram(kernel, T, SVs::SupportVectors, ntrain::Int)
     npredict = axes(T, 2)
     gram = zeros(ntrain, size(T, 2))
 
@@ -317,7 +317,7 @@ input matrix `X` for linear kernel.
 function svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         svmtype::Type = SVC,
-        kernel::Union{Kernel.KERNEL, Function} = Kernel.RadialBasis,
+        kernel = Kernel.RadialBasis,
         degree::Integer = 3,
         gamma::Float64 = 1.0 / size(X, 1),
         coef0::Float64 = 0.0,
