@@ -106,7 +106,13 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
         unsafe_copyto!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
-    SVM(svmtype, kernel, weights, size(X,1),
+    if kernel == Kernel.Precomputed
+        nfeatures = size(X, 2)
+    else
+        nfeatures = size(X, 1)
+    end
+
+    SVM(svmtype, kernel, weights, nfeatures,
         smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
         svs, smc.param.coef0, coefs, probA, probB,
         rho, smc.param.degree,
@@ -373,7 +379,9 @@ function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where 
     set_num_threads(nt)
 
     if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
-        throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
+        throw(DimensionMismatch("Model has $(model.nfeatures) features but $(size(X, 1)) provided"))
+    elseif model.kernel == Kernel.Precomputed && size(X, 1) != model.nfeatures
+            throw(DimensionMismatch("Gram matrix should have $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
