@@ -192,7 +192,7 @@ end
         @test model.rho ≈ [0]
         @test model.coefs ≈ [0.25; -0.25]
         @test model.SVs.indices == [2, 4]
-        
+
         ỹ, _ = svmpredict(model, K)
 
         @test y == ỹ

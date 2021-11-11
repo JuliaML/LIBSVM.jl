@@ -229,9 +229,9 @@ function check_train_input(X, y, kernel)
 end
 
 function data2gram(kernel_function, X)
-    n1 = axes(X, 2)
-    gram = Array{Float64}(undef, n1.stop, n1.stop)
-    for i in n1
+    ntrain = size(X, 2)
+    gram = Array{Float64}(undef, ntrain, ntrain)
+    for i=1:ntrain
         for j in 1:i
             if i==j
                 gram[i,i] = kernel_function(X[:,i], X[:,i])
@@ -245,11 +245,11 @@ end
 
 
 function data2gram(kernel, T, SVs::SupportVectors, ntrain::Int)
-    npredict = axes(T, 2)
-    gram = zeros(ntrain, size(T, 2))
+    npredict = size(T, 2)
+    gram = zeros(ntrain, npredict)
 
     for (i, idx) in enumerate(SVs.indices)
-        for j in npredict
+        for j=1:npredict
             x = SVs.X[:, i]
             gram[idx,j] = kernel(x, T[:,j])
         end
