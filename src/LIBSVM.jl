@@ -236,9 +236,7 @@ function data2gram(kernel_function::Function, X)
             if i==j
                 gram[i,i] = kernel_function(X[:,i], X[:,i])
             else
-                interm = kernel_function(X[:, i], X[:, j])
-                gram[i,j] = interm
-                gram[j,i] = interm
+                gram[i, j] = gram[j, i] = kernel_function(X[:, i], X[:, j])
             end
         end
     end
