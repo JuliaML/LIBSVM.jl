@@ -144,7 +144,8 @@ function svmmodel(mod::SVM)
     end
 
     if !isa(mod.kernel, Kernel.KERNEL) || mod.kernel == Kernel.Precomputed
-        # This is necessary to construct SupportVectors correctly
+        # In case of precomputed gram matrices libsvm assumes that `X[j][0]`
+        # contains the index of the `j`-th instance.
         nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.indices')
     else
         nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
