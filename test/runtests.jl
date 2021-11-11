@@ -180,6 +180,7 @@ end
     end
 
     @testset "Trivial data" begin
+        # adapted from sklearn's tests
         X = [-2 -1 -1 1 1 2;
              -1 -1 -2 1 2 1]
         y = [1, 1, 1, 2, 2, 2]
