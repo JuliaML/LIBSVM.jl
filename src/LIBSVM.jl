@@ -45,6 +45,7 @@ struct SVM{T, K}
     kernel::K
     weights::Union{Dict{T,Float64},Cvoid}
     nfeatures::Int
+    ntrain::Int
     nclasses::Int32
     labels::Vector{T}
     libsvmlabel::Vector{Int32}
@@ -106,15 +107,7 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
         unsafe_copyto!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
-    if kernel == Kernel.Precomputed || !isa(kernel, Kernel.KERNEL)
-        # in the precomputed case, each data point we want to predict has
-        # l gram matrix entries (≈ features), where l is the number of training vectors.
-        nfeatures = size(X, 2)
-    else
-        nfeatures = size(X,1)
-    end
-
-    SVM(svmtype, kernel, weights, nfeatures,
+    SVM(svmtype, kernel, weights, size(X, 1), size(X, 2),
         smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
         svs, smc.param.coef0, coefs, probA, probB,
         rho, smc.param.degree,
@@ -151,7 +144,8 @@ function svmmodel(mod::SVM)
     end
 
     if !isa(mod.kernel, Kernel.KERNEL) || mod.kernel == Kernel.Precomputed
-        # This is necessary to construct SupportVectors correctly
+        # In case of precomputed gram matrices libsvm assumes that `X[j][0]`
+        # contains the index of the `j`-th instance.
         nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.indices')
     else
         nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
@@ -242,9 +236,7 @@ function data2gram(kernel_function::Function, X)
             if i==j
                 gram[i,i] = kernel_function(X[:,i], X[:,i])
             else
-                interm = kernel_function(X[:, i], X[:, j])
-                gram[i,j] = interm
-                gram[j,i] = interm
+                gram[i, j] = gram[j, i] = kernel_function(X[:, i], X[:, j])
             end
         end
     end
@@ -252,12 +244,12 @@ function data2gram(kernel_function::Function, X)
 end
 
 
-function data2gram(kernel::Function, T, SVs::SupportVectors, nfeatures::Int)
-    n2 = axes(T, 2) # number of datapoints to predict
-    gram = zeros(nfeatures, size(T, 2))
+function data2gram(kernel::Function, T, SVs::SupportVectors, ntrain::Int)
+    npredict = axes(T, 2)
+    gram = zeros(ntrain, size(T, 2))
 
     for (i, idx) in enumerate(SVs.indices)
-        for j in n2
+        for j in npredict
             x = SVs.X[:, i]
             gram[idx,j] = kernel(x, T[:,j])
         end
@@ -428,14 +420,16 @@ of `T` the testing instances.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if model.kernel != Kernel.Precomputed && isa(model.kernel, Kernel.KERNEL) && size(X, 1) != model.nfeatures
-        throw(DimensionMismatch("Model has $(model.nfeatures) but $(size(X, 1)) provided"))
+    if model.kernel == Kernel.Precomputed && size(X, 1) != model.ntrain
+            throw(DimensionMismatch("Gram matrix should have $(model.ntrain) rows but $(size(X, 1)) provided"))
+    elseif size(X, 1) != model.nfeatures
+        throw(DimensionMismatch("Model has $(model.nfeatures) features but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
 
     if !isa(model.kernel, Kernel.KERNEL)
-        gram = data2gram(model.kernel, X, model.SVs, model.nfeatures)
+        gram = data2gram(model.kernel, X, model.SVs, model.ntrain)
         (nodes, nodeptrs) = gram2nodes(gram)
     elseif model.kernel == Kernel.Precomputed
         (nodes, nodeptrs) = gram2nodes(X)
