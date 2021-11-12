@@ -3,6 +3,7 @@ using FileIO
 using JLD2
 using LIBSVM
 using RDatasets
+using Serialization
 using SparseArrays
 using Statistics
 using Test
@@ -391,6 +392,24 @@ end
         ỹ, _  = svmpredict(model, T)
 
         @test ŷ == ỹ
+    end
+
+    @testset "Serialize/Deserialize" begin
+        X = [-2 -1 -1 1 1 2;
+             -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        kernel(x1, x2) = x1' * x2
+
+        model₁ = svmtrain(X, y, kernel=kernel)
+        serialize("serialized_svm.jls", model₁)
+
+        model₂ = deserialize("serialized_svm.jls")
+
+        y₁ = svmpredict(model₁, X)
+        y₂ = svmpredict(model₂, X)
+
+        @test y₁ == y₂
     end
 end
 
