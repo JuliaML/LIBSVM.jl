@@ -328,7 +328,7 @@ function svmtrain(
     isempty(y) && (svmtype = OneClassSVM)
 
     _svmtype = SVMTYPES[svmtype]
-    _kernel = Int32(ifelse(mod.kernel isa Kernel.KERNEL, kernel, Kernel.Precomputed))
+    _kernel = Int32(ifelse(kernel isa Kernel.KERNEL, kernel, Kernel.Precomputed))
     wts = weights
 
     if svmtype ∈ (EpsilonSVR, NuSVR)
