@@ -227,10 +227,8 @@ end
 function data2gram(kernel_function, X)
     ntrain = size(X, 2)
     gram = Array{Float64}(undef, ntrain, ntrain)
-    for i=1:ntrain
     for i ∈ 1:ntrain, j ∈ 1:i
-                gram[i, j] = gram[j, i] = kernel_function(X[:, i], X[:, j])
-        end
+        gram[i, j] = gram[j, i] = kernel_function(@view(X[:, i]), @view(X[:, j]))
     end
     return gram
 end
@@ -240,7 +238,7 @@ function data2gram(kernel, T, SVs::SupportVectors, ntrain::Int)
     npredict = size(T, 2)
     gram = zeros(ntrain, npredict)
 
-    for (i, idx) in enumerate(SVs.indices)
+    for (i, idx) ∈ enumerate(SVs.indices)
         x = @view SVs.X[:, i]
         for j ∈ 1:npredict
             gram[idx, j] = kernel(x, @view(T[:, j]))
@@ -356,15 +354,12 @@ function svmtrain(
     ninstances = size(X, 2)
 
     # Construct SVMProblem
-    if !isa(kernel, Kernel.KERNEL)
-        gram = data2gram(kernel, X)
-        (nodes, nodeptrs) = gram2nodes(gram)
+    if !(kernel isa Kernel.KERNEL)
+        nodes, nodeptrs = gram2nodes(data2gram(kernel, X))
+    elseif kernel == Kernel.Precomputed
+        nodes, nodeptrs = gram2nodes(X)
     else
-        if kernel == Kernel.Precomputed
-            (nodes, nodeptrs) = gram2nodes(X)
-        else
-            (nodes, nodeptrs) = instances2nodes(X)
-        end
+       nodes, nodeptrs =  instances2nodes(X)
     end
     problem = SVMProblem(Int32(ninstances), pointer(idx), pointer(nodeptrs))
 
