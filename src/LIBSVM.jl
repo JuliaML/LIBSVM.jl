@@ -126,11 +126,7 @@ end
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
     svm_type = Int32(SVMTYPES[mod.SVMtype])
-    if isa(mod.kernel, Kernel.KERNEL)
-        kernel = Int32(mod.kernel)
-    else
-        kernel = Int32(Kernel.Precomputed)
-    end
+    kernel = Int32(ifelse(mod.kernel isa Kernel.KERNEL, mod.kernel, Kernel.Precomputed))
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
                         mod.coef0, mod.cache_size, mod.tolerance, mod.cost,
@@ -143,7 +139,7 @@ function svmmodel(mod::SVM)
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
 
-    if !isa(mod.kernel, Kernel.KERNEL) || mod.kernel == Kernel.Precomputed
+    if kernel == Int32(Kernel.Precomputed)
         # In case of precomputed gram matrices libsvm assumes that `X[j][0]`
         # contains the index of the `j`-th instance.
         nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.indices')
@@ -232,12 +228,8 @@ function data2gram(kernel_function, X)
     ntrain = size(X, 2)
     gram = Array{Float64}(undef, ntrain, ntrain)
     for i=1:ntrain
-        for j in 1:i
-            if i==j
-                gram[i,i] = kernel_function(X[:,i], X[:,i])
-            else
+    for i ∈ 1:ntrain, j ∈ 1:i
                 gram[i, j] = gram[j, i] = kernel_function(X[:, i], X[:, j])
-            end
         end
     end
     return gram
@@ -249,9 +241,9 @@ function data2gram(kernel, T, SVs::SupportVectors, ntrain::Int)
     gram = zeros(ntrain, npredict)
 
     for (i, idx) in enumerate(SVs.indices)
-        for j=1:npredict
-            x = SVs.X[:, i]
-            gram[idx,j] = kernel(x, T[:,j])
+        x = @view SVs.X[:, i]
+        for j ∈ 1:npredict
+            gram[idx, j] = kernel(x, @view(T[:, j]))
         end
     end
     return gram
@@ -336,13 +328,7 @@ function svmtrain(
     isempty(y) && (svmtype = OneClassSVM)
 
     _svmtype = SVMTYPES[svmtype]
-
-    if isa(kernel, Kernel.KERNEL)
-        _kernel = Int32(kernel)
-    else
-        _kernel = Int32(Kernel.Precomputed)
-    end
-
+    _kernel = Int32(ifelse(mod.kernel isa Kernel.KERNEL, kernel, Kernel.Precomputed))
     wts = weights
 
     if svmtype ∈ (EpsilonSVR, NuSVR)
