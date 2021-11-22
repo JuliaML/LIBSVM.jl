@@ -277,7 +277,7 @@ For one-class SVM use only `X`.
 * `svmtype::Type = LIBSVM.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
     `OneClassSVM`, `EpsilonSVR` or `NuSVR`. Defaults to `OneClassSVM` if
     `y` is not used.
-* `kernel::Kernels.KERNEL = Kernel.RadialBasis`: Model kernel `Kernels.Linear`, `Kernels.Polynomial`,
+* `kernel = Kernel.RadialBasis`: Model kernel `Kernels.Linear`, `Kernels.Polynomial`,
     `Kernels.RadialBasis`, `Kernels.Sigmoid`, `Kernels.Precomputed` or a `Base.Callable`.
 * `degree::Integer = 3`: Kernel degree. Used for polynomial kernel
 * `gamma::Float64 = 1.0/size(X, 1)` : γ for kernels
