@@ -18,7 +18,7 @@ function transform(model::OneClassSVM, X::AbstractArray)
     return p
 end
 
-SVC(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
+SVC(;kernel = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
     weights = nothing, cost::Float64 = 1.0, degree::Int32 = Int32(3),
     coef0::Float64 = 0.0, tolerance::Float64 = .001,
     shrinking::Bool = true, probability::Bool = false,
@@ -27,7 +27,7 @@ SVC(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = 
     probability, verbose, nothing)
 @declare_hyperparameters(SVC, [:kernel, :gamma, :weights, :cost, :degree, :coef0, :tolerance])
 
-NuSVC(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
+NuSVC(;kernel = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
         weights = nothing, nu::Float64 = 0.5, cost::Float64 = 1.0,
         degree::Int32 = Int32(3), coef0::Float64 = 0.,
         tolerance::Float64 = .001, shrinking::Bool = true,
@@ -35,7 +35,7 @@ NuSVC(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} 
             degree, coef0, tolerance, shrinking, verbose, nothing)
 @declare_hyperparameters(NuSVC, [:kernel, :gamma, :weights, :nu, :cost, :degree, :coef0, :tolerance])
 
-OneClassSVM(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
+OneClassSVM(;kernel = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
         nu::Float64 = 0.1, cost::Float64 = 1.0, degree::Int32 = Int32(3),
         coef0::Float64 = 0.0, tolerance::Float64 = .001,
         shrinking::Bool = true,
@@ -43,14 +43,14 @@ OneClassSVM(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Sy
         degree, coef0, tolerance, shrinking, verbose, nothing)
 @declare_hyperparameters(OneClassSVM, [:kernel, :gamma, :nu, :cost, :degree, :coef0, :tolerance])
 
-NuSVR(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
+NuSVR(;kernel = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
         nu::Float64 = 0.5, cost::Float64 = 1.0, degree::Int32 = Int32(3), coef0::Float64 = 0.,
         tolerance::Float64 = .001, shrinking::Bool = true,
         verbose::Bool = false,) = NuSVR(kernel, gamma, nu, cost,
                     degree, coef0, tolerance, shrinking, verbose, nothing)
 @declare_hyperparameters(NuSVR, [:kernel, :gamma, :nu, :cost, :degree, :coef0, :tolerance])
 
-EpsilonSVR(;kernel::Kernel.KERNEL = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
+EpsilonSVR(;kernel = Kernel.RadialBasis, gamma::Union{Float64,Symbol} = :auto,
         epsilon::Float64 = 0.1, cost::Float64 = 1.0,
         degree::Int32 = Int32(3), coef0::Float64 = 0.,
         tolerance::Float64 = .001, shrinking::Bool = true,
