@@ -5,7 +5,7 @@ abstract type AbstractSVC<:BaseClassifier end
 abstract type AbstractSVR<:BaseRegressor end
 
 mutable struct SVC<:AbstractSVC
-    kernel::Kernel.KERNEL
+    kernel
     gamma::Union{Float64,Symbol}
     weights::Union{Dict, Cvoid}
     cost::Float64
@@ -20,7 +20,7 @@ mutable struct SVC<:AbstractSVC
 end
 
 mutable struct NuSVC<:AbstractSVC
-    kernel::Kernel.KERNEL
+    kernel
     gamma::Union{Float64,Symbol}
     weights::Union{Dict, Cvoid}
     nu::Float64
@@ -35,7 +35,7 @@ mutable struct NuSVC<:AbstractSVC
 end
 
 mutable struct OneClassSVM<:AbstractSVC
-    kernel::Kernel.KERNEL
+    kernel
     gamma::Union{Float64,Symbol}
     nu::Float64
     cost::Float64
@@ -49,7 +49,7 @@ mutable struct OneClassSVM<:AbstractSVC
 end
 
 mutable struct NuSVR<:AbstractSVR
-    kernel::Kernel.KERNEL
+    kernel
     gamma::Union{Float64,Symbol}
     nu::Float64
     cost::Float64
@@ -63,7 +63,7 @@ mutable struct NuSVR<:AbstractSVR
 end
 
 mutable struct EpsilonSVR<:AbstractSVR
-    kernel::Kernel.KERNEL
+    kernel
     gamma::Union{Float64,Symbol}
     epsilon::Float64
     cost::Float64

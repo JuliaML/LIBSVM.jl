@@ -3,6 +3,7 @@ using FileIO
 using JLD2
 using LIBSVM
 using RDatasets
+using Serialization
 using SparseArrays
 using Statistics
 using Test
@@ -180,6 +181,7 @@ end
     end
 
     @testset "Trivial data" begin
+        # adapted from sklearn's tests
         X = [-2 -1 -1 1 1 2;
              -1 -1 -2 1 2 1]
         y = [1, 1, 1, 2, 2, 2]
@@ -274,7 +276,7 @@ end
 
     @testset "Malformed prediction" begin
         X = [-2 -1 -1 1 1 2;
-            -1 -1 -2 1 2 1]
+             -1 -1 -2 1 2 1]
         y = [1, 1, 1, 2, 2, 2]
 
         T = [-1 2 3;
@@ -289,6 +291,147 @@ end
         KK_malformed = KK[1:1,:]
 
         @test_throws DimensionMismatch svmpredict(model, KK_malformed)
+    end
+end
+
+
+@testset "Callable kernel" begin
+    @testset "Trivial data" begin
+        X = [-2 -1 -1 1 1 2;
+             -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        kernel(x1, x2) = x1' * x2
+
+        model = svmtrain(X, y, kernel=kernel)
+
+        @test model.rho ≈ [0]
+        @test model.coefs ≈ [0.25; -0.25]
+        @test model.SVs.indices == [2, 4]
+
+        ỹ, _ = svmpredict(model, X)
+
+        @test y == ỹ
+
+        T = [-1 2 3;
+             -1 2 2]
+
+        ỹ, _ = svmpredict(model, T)
+        @test [1, 2, 2] == ỹ
+    end
+
+    @testset "Iris data" begin
+        X, y = load_iris()
+
+        kernel(x1, x2) = x1' * x2
+
+        model  = svmtrain(X, y, kernel=kernel)
+        model₂ = svmtrain(X, y, kernel=Kernel.Linear)
+
+        @test model.rho ≈ model₂.rho
+        @test model.coefs ≈ model₂.coefs
+        @test model.SVs.indices ≈ model₂.SVs.indices
+
+        ỹ, _  = svmpredict(model, X)
+
+        @test mean(y .== ỹ) > .99
+    end
+
+    @testset "Circle data" begin
+        distance(x) = x[1]^2 + x[2]^2
+
+        X = [0.72  0.68  0.28  0.75  0.47  0.26  0.95  0.0   0.95  0.39;
+             0.49  0.07  0.67  0.94  0.4   0.98  0.21  0.29  0.91  0.16]
+        
+        y = 0.5 .< [distance(x) for x ∈ eachcol(X)]
+
+        kernel(x1, x2) = x1' * x2 + distance(x1) * distance(x2)
+
+        model  = svmtrain(X, y, kernel=kernel)
+        ỹ, _ = svmpredict(model, X)
+        @test y == ỹ
+
+        T = [0.57  0.56  0.57  0.51;
+             0.9   0.37  0.04  0.76]
+        
+        ŷ = 0.5 .< [distance(x) for x ∈ eachcol(T)]
+        ỹ, _  = svmpredict(model, T)
+
+        @test ŷ == ỹ
+    end
+
+    @testset "Non-function callable" begin
+        distance(x) = x[1]^2 + x[2]^2
+
+        struct CallableStruct
+            a0::Float64
+            a1::Float64
+            a2::Float64
+        end
+
+        function (p::CallableStruct)(x1, x2)
+            return p.a0 + p.a1 * x1' * x2 + p.a2 * distance(x1) * distance(x2)
+        end
+
+        kernel = CallableStruct(0, 1, 1)
+
+        X = [0.72  0.68  0.28  0.75  0.47  0.26  0.95  0.0   0.95  0.39;
+             0.49  0.07  0.67  0.94  0.4   0.98  0.21  0.29  0.91  0.16]
+        y = 0.5 .< [distance(x) for x ∈ eachcol(X)]
+
+        @test !isa(kernel, Function)
+
+        model  = svmtrain(X, y, kernel=kernel)
+        ỹ, _ = svmpredict(model, X)
+        @test y == ỹ
+
+        T = [0.57  0.56  0.57  0.51;
+             0.9   0.37  0.04  0.76]
+
+        ŷ = 0.5 .< [distance(x) for x ∈ eachcol(T)]
+        ỹ, _  = svmpredict(model, T)
+
+        @test ŷ == ỹ
+    end
+
+    @testset "Serialize/Deserialize" begin
+        X = [-2 -1 -1 1 1 2;
+             -1 -1 -2 1 2 1]
+        y = [1, 1, 1, 2, 2, 2]
+
+        kernel(x1, x2) = x1' * x2
+
+        model₁ = svmtrain(X, y, kernel=kernel)
+        serialize("serialized_svm.jls", model₁)
+
+        model₂ = deserialize("serialized_svm.jls")
+
+        y₁ = svmpredict(model₁, X)
+        y₂ = svmpredict(model₂, X)
+
+        @test y₁ == y₂
+    end
+
+    @testset "ScikitLearnAPI.jl + Callable" begin
+        distance(x) = x[1]^2 + x[2]^2
+
+        X = [0.72  0.68  0.28  0.75  0.47  0.26  0.95  0.0   0.95  0.39;
+             0.49  0.07  0.67  0.94  0.4   0.98  0.21  0.29  0.91  0.16]
+
+        y = 0.5 .< [distance(x) for x ∈ eachcol(X)]
+
+        kernel(x1, x2) = x1' * x2 + distance(x1) * distance(x2)
+
+        model = SVC(kernel=kernel)
+        fit!(model, X', y)
+
+        T = [0.57  0.56  0.57  0.51;
+            0.9   0.37  0.04  0.76]
+
+        ŷ = 0.5 .< [distance(x) for x ∈ eachcol(T)]
+        ỹ = predict(model, T')
+
+        @test ŷ == ỹ
     end
 end
 

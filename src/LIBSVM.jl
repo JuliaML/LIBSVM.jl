@@ -40,11 +40,12 @@ function SupportVectors(smc::SVMModel, y, X)
     SupportVectors(smc.l, nSV, yi , X[:,sv_indices], sv_indices, nodes)
 end
 
-struct SVM{T}
+struct SVM{T, K}
     SVMtype::Type
-    kernel::Kernel.KERNEL
+    kernel::K
     weights::Union{Dict{T,Float64},Cvoid}
     nfeatures::Int
+    ntrain::Int
     nclasses::Int32
     labels::Vector{T}
     libsvmlabel::Vector{Int32}
@@ -106,13 +107,7 @@ function SVM(smc::SVMModel, y, X, weights, labels, svmtype, kernel)
         unsafe_copyto!(pointer(libsvmweight_label), smc.param.weight_label, nw)
     end
 
-    if kernel == Kernel.Precomputed
-        nfeatures = size(X, 2)
-    else
-        nfeatures = size(X, 1)
-    end
-
-    SVM(svmtype, kernel, weights, nfeatures,
+    SVM(svmtype, kernel, weights, size(X, 1), size(X, 2),
         smc.nr_class, labels, libsvmlabel, libsvmweight, libsvmweight_label,
         svs, smc.param.coef0, coefs, probA, probB,
         rho, smc.param.degree,
@@ -131,7 +126,7 @@ end
 """Convert SVM model to libsvm struct for prediction"""
 function svmmodel(mod::SVM)
     svm_type = Int32(SVMTYPES[mod.SVMtype])
-    kernel = Int32(mod.kernel)
+    kernel = Int32(ifelse(mod.kernel isa Kernel.KERNEL, mod.kernel, Kernel.Precomputed))
 
     param = SVMParameter(svm_type, kernel, mod.degree, mod.gamma,
                         mod.coef0, mod.cache_size, mod.tolerance, mod.cost,
@@ -144,7 +139,13 @@ function svmmodel(mod::SVM)
         sv_coef[i] = pointer(mod.coefs, (i-1)*n+1)
     end
 
-    nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
+    if kernel == Int32(Kernel.Precomputed)
+        # In case of precomputed gram matrices libsvm assumes that `X[j][0]`
+        # contains the index of the `j`-th instance.
+        nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.indices')
+    else
+        nodes, ptrs = LIBSVM.instances2nodes(mod.SVs.X)
+    end
     data = SVMData(sv_coef, nodes, ptrs)
 
     cmod = SVMModel(param, mod.nclasses, mod.SVs.l, pointer(data.nodeptrs), pointer(data.coefs),
@@ -223,11 +224,35 @@ function check_train_input(X, y, kernel)
     end
 end
 
+function data2gram(kernel_function, X)
+    ntrain = size(X, 2)
+    gram = Array{Float64}(undef, ntrain, ntrain)
+    for i ∈ 1:ntrain, j ∈ 1:i
+        gram[i, j] = gram[j, i] = kernel_function(@view(X[:, i]), @view(X[:, j]))
+    end
+    return gram
+end
+
+
+function data2gram(kernel, T, SVs::SupportVectors, ntrain::Int)
+    npredict = size(T, 2)
+    gram = zeros(ntrain, npredict)
+
+    for (i, idx) ∈ enumerate(SVs.indices)
+        x = @view SVs.X[:, i]
+        for j ∈ 1:npredict
+            gram[idx, j] = kernel(x, @view(T[:, j]))
+        end
+    end
+    return gram
+end
+
+
 """
     svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         svmtype::Type = SVC,
-        kernel::Kernel.KERNEL = Kernel.RadialBasis,
+        kernel = Kernel.RadialBasis,
         degree::Integer = 3,
         gamma::Float64 = 1.0/size(X, 1),
         coef0::Float64 = 0.0,
@@ -252,8 +277,8 @@ For one-class SVM use only `X`.
 * `svmtype::Type = LIBSVM.SVC`: Type of SVM to train `SVC` (for C-SVM), `NuSVC`
     `OneClassSVM`, `EpsilonSVR` or `NuSVR`. Defaults to `OneClassSVM` if
     `y` is not used.
-* `kernel::Kernels.KERNEL = Kernel.RadialBasis`: Model kernel `Linear`, `Polynomial`,
-    `RadialBasis`, `Sigmoid` or `Precomputed`.
+* `kernel = Kernel.RadialBasis`: Model kernel `Kernels.Linear`, `Kernels.Polynomial`,
+    `Kernels.RadialBasis`, `Kernels.Sigmoid`, `Kernels.Precomputed` or a `Base.Callable`.
 * `degree::Integer = 3`: Kernel degree. Used for polynomial kernel
 * `gamma::Float64 = 1.0/size(X, 1)` : γ for kernels
 * `coef0::Float64 = 0.0`: parameter for sigmoid and polynomial kernel
@@ -282,7 +307,7 @@ input matrix `X` for linear kernel.
 function svmtrain(
         X::AbstractMatrix{U}, y::AbstractVector{T} = [];
         svmtype::Type = SVC,
-        kernel::Kernel.KERNEL = Kernel.RadialBasis,
+        kernel = Kernel.RadialBasis,
         degree::Integer = 3,
         gamma::Float64 = 1.0 / size(X, 1),
         coef0::Float64 = 0.0,
@@ -301,7 +326,7 @@ function svmtrain(
     isempty(y) && (svmtype = OneClassSVM)
 
     _svmtype = SVMTYPES[svmtype]
-    _kernel = Int32(kernel)
+    _kernel = Int32(ifelse(kernel isa Kernel.KERNEL, kernel, Kernel.Precomputed))
     wts = weights
 
     if svmtype ∈ (EpsilonSVR, NuSVR)
@@ -329,14 +354,12 @@ function svmtrain(
     ninstances = size(X, 2)
 
     # Construct SVMProblem
-    if kernel == Kernel.Precomputed
-        (nodes, nodeptrs) = gram2nodes(X)
-
-        # This is necessary to construct SupportVectors correctly
-        # The struct needs to contain the indices of support vectors
-        X = (1:size(X, 1))'
+    if !(kernel isa Kernel.KERNEL)
+        nodes, nodeptrs = gram2nodes(data2gram(kernel, X))
+    elseif kernel == Kernel.Precomputed
+        nodes, nodeptrs = gram2nodes(X)
     else
-        (nodes, nodeptrs) = instances2nodes(X)
+       nodes, nodeptrs =  instances2nodes(X)
     end
     problem = SVMProblem(Int32(ninstances), pointer(idx), pointer(nodeptrs))
 
@@ -378,14 +401,18 @@ of `T` the testing instances.
 function svmpredict(model::SVM{T}, X::AbstractMatrix{U}; nt::Integer = 0) where {T,U<:Real}
     set_num_threads(nt)
 
-    if model.kernel != Kernel.Precomputed && size(X, 1) != model.nfeatures
+    if model.kernel == Kernel.Precomputed && size(X, 1) != model.ntrain
+            throw(DimensionMismatch("Gram matrix should have $(model.ntrain) rows but $(size(X, 1)) provided"))
+    elseif size(X, 1) != model.nfeatures
         throw(DimensionMismatch("Model has $(model.nfeatures) features but $(size(X, 1)) provided"))
-    elseif model.kernel == Kernel.Precomputed && size(X, 1) != model.nfeatures
-            throw(DimensionMismatch("Gram matrix should have $(model.nfeatures) but $(size(X, 1)) provided"))
     end
 
     ninstances = size(X, 2)
-    if model.kernel == Kernel.Precomputed
+
+    if !isa(model.kernel, Kernel.KERNEL)
+        gram = data2gram(model.kernel, X, model.SVs, model.ntrain)
+        (nodes, nodeptrs) = gram2nodes(gram)
+    elseif model.kernel == Kernel.Precomputed
         (nodes, nodeptrs) = gram2nodes(X)
     else
         (nodes, nodeptrs) = instances2nodes(X)
