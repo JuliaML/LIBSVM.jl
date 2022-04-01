@@ -144,12 +144,14 @@ The MLJ interface to LIBSVM.jl consists of the following models:
 
 Each model has a detailed document string, which includes examples of
 usage. Document strings can be accessed from MLJ without loading
-`LIBSVM.jl` or its MLJ interface as shown in the following example:
+`LIBSVM.jl` (or its MLJ interface) as shown in the following example:
 
 ```julia
 using MLJ     # or MLJModels 
 doc("NuSVC", pkg="LIBSVM")
 ```
+
+This assumes the version of MLJModels loaded is 0.15.5 or higher.
 
 Below we illustrate usage of the classic kernel `SVC` classifier. In
 the example, `X` can be replaced with any table (e.g., `DataFrame`)
