@@ -214,7 +214,7 @@ julia> yhat = predict(mach, Xnew)
 
 ## Credits
 
-The library is currently developed and maintained by Matti Pastell. It was originally
-developed by Simon Kornblith.
+The LIBSVM.jl library is currently developed and maintained by Matti
+Pastell. It was originally developed by Simon Kornblith.
 
 [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/) by Chih-Chung Chang and Chih-Jen Lin
