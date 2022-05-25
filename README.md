@@ -153,64 +153,6 @@ doc("NuSVC", pkg="LIBSVM")
 
 This assumes the version of MLJModels loaded is 0.15.5 or higher.
 
-Below we illustrate usage of the classic kernel `SVC` classifier. In
-the example, `X` can be replaced with any table (e.g., `DataFrame`)
-whose columns have `Float64` eltype. The target `y` can be any
-`CategoricalVector`.
-
-### Using a built-in kernel
-
-```
-using MLJ
-import LIBSVM
-
-SVC = @load SVC pkg=LIBSVM                   # model type
-model = SVC(kernel=LIBSVM.Kernel.Polynomial) # instance
-
-X, y = @load_iris # table, vector
-mach = machine(model, X, y) |> fit!
-
-Xnew = (sepal_length = [6.4, 7.2, 7.4],
-        sepal_width = [2.8, 3.0, 2.8],
-        petal_length = [5.6, 5.8, 6.1],
-        petal_width = [2.1, 1.6, 1.9],)
-
-julia> yhat = predict(mach, Xnew)
-3-element CategoricalArrays.CategoricalArray{String,1,UInt32}:
- "virginica"
- "virginica"
- "virginica"
-```
-
-### User-defined kernels
-
-```
-k(x1, x2) = x1'*x2 # equivalent to `LIBSVM.Kernel.Linear`
-model = SVC(kernel=k)
-mach = machine(model, X, y) |> fit!
-
-julia> yhat = predict(mach, Xnew)
-3-element CategoricalArrays.CategoricalArray{String,1,UInt32}:
- "virginica"
- "virginica"
- "virginica"
-```
-
-### Incorporating class weights
-
-In either scenario above, we can do:
-
-```julia
-weights = Dict("virginica" => 1, "versicolor" => 20, "setosa" => 1)
-mach = machine(model, X, y, weights) |> fit!
-
-julia> yhat = predict(mach, Xnew)
-3-element CategoricalArrays.CategoricalArray{String,1,UInt32}:
- "versicolor"
- "versicolor"
- "versicolor"
-```
-
 
 ## Credits
 
