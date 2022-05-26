@@ -136,7 +136,7 @@ model = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
 
 ### MLJ API
 
-The MLJ interface to LIBSVM.jl consists of the following models:
+The [MLJ](https://alan-turing-institute.github.io/MLJ.jl/dev/) interface to LIBSVM.jl consists of the following models:
 
 - classification: `LinearSVC`, `SVC`, `NuSVC` 
 - regression: `EpsilonSVR`, `NuSVR`
