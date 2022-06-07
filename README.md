@@ -3,7 +3,10 @@
 [![Build Status](https://github.com/JuliaML/LIBSVM.jl/workflows/CI/badge.svg?branch=master)](https://github.com/JuliaML/LIBSVM.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/JuliaML/LIBSVM.jl/branch/master/graph/badge.svg?token=bGwzyTtNPn)](https://codecov.io/gh/JuliaML/LIBSVM.jl)
 
-This is a Julia interface for [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/).
+This is a Julia interface for
+[LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/) and for the linear
+SVM model provided by
+[LIBLINEAR](https://www.csie.ntu.edu.tw/~cjlin/liblinear/).
 
 **Features:**
 * Supports all LIBSVM models: classification C-SVC, nu-SVC, regression: epsilon-SVR, nu-SVR
@@ -131,9 +134,29 @@ model = fit!(EpsilonSVR(cost = 10., gamma = 1.), X, y)
 ŷ = predict(model, X)
 ```
 
+### MLJ API
+
+The [MLJ](https://alan-turing-institute.github.io/MLJ.jl/dev/) interface to LIBSVM.jl consists of the following models:
+
+- classification: `LinearSVC`, `SVC`, `NuSVC` 
+- regression: `EpsilonSVR`, `NuSVR`
+- outlier detection: `OneClassSVM`
+
+Each model has a detailed document string, which includes examples of
+usage. Document strings can be accessed from MLJ without loading
+`LIBSVM.jl` (or its MLJ interface) as shown in the following example:
+
+```julia
+using MLJ     # or MLJModels 
+doc("NuSVC", pkg="LIBSVM")
+```
+
+This assumes the version of MLJModels loaded is 0.15.5 or higher.
+
+
 ## Credits
 
-The library is currently developed and maintained by Matti Pastell. It was originally
-developed by Simon Kornblith.
+The LIBSVM.jl library is currently developed and maintained by Matti
+Pastell. It was originally developed by Simon Kornblith.
 
 [LIBSVM](http://www.csie.ntu.edu.tw/~cjlin/libsvm/) by Chih-Chung Chang and Chih-Jen Lin
