@@ -402,9 +402,12 @@ end
         kernel(x1, x2) = x1' * x2
 
         model₁ = svmtrain(X, y, kernel=kernel)
-        serialize("serialized_svm.jls", model₁)
 
-        model₂ = deserialize("serialized_svm.jls")
+        model₂ = mktempdir() do path
+            modelpath = joinpath(path, "serialized_svm.jls")
+            serialize(modelpath, model₁)
+            return deserialize(modelpath)
+        end
 
         y₁ = svmpredict(model₁, X)
         y₂ = svmpredict(model₂, X)
