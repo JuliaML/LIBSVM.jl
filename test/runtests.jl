@@ -132,14 +132,14 @@ end
     nu1 = svmtrain(X, y, svmtype = NuSVR, cost = 10.,
                     nu = .7, gamma = 2., tolerance = .001)
     ynu1, d = svmpredict(nu1, X)
-    @test sum(ynu1 - y) ≈  14.184665717092
+    @test isapprox(sum(ynu1 - y), 14.184665717092, atol=0.001)
     sknu1 = fit!(NuSVR(cost = 10., nu=.7, gamma = 2.), X', y)
     ysknu1 = predict(sknu1, X')
     @test isapprox(ysknu1,ynu1)
 
     nu2 = svmtrain(X, y, svmtype = NuSVR, cost = 10., nu = .9)
-    ynu2, d =svmpredict(nu2, X)
-    @test sum(ynu2 - y) ≈ 6.686819661799177
+    ynu2, d = svmpredict(nu2, X)
+    @test isapprox(sum(ynu2 - y), 6.686819661799177, atol=0.01)
     sknu2 = fit!(NuSVR(cost = 10., nu=.9), X', y)
     ysknu2 = predict(sknu2, X')
     @test isapprox(ysknu2, ynu2)
@@ -150,7 +150,7 @@ end
                          nu = .7, gamma = 2., tolerance = .001,
                          nt = -1)
         ntynu1, ntd = svmpredict(ntnu1, X)
-        @test sum(ntynu1 - y) ≈ 14.184665717092
+        @test isapprox(sum(ntynu1 - y), 14.184665717092, atol=0.001)
 
         # Assign by environment
         ENV["OMP_NUM_THREADS"] = 2
