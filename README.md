@@ -1,6 +1,6 @@
 # LIBSVM.jl
 
-[![Build Status](https://github.com/JuliaML/LIBSVM.jl/workflows/CI/badge.svg?branch=master)](https://github.com/JuliaML/LIBSVM.jl/actions?query=workflow%3ACI)
+[![Build Status](https://github.com/JuliaML/LIBSVM.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/JuliaML/LIBSVM.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/JuliaML/LIBSVM.jl/branch/master/graph/badge.svg?token=bGwzyTtNPn)](https://codecov.io/gh/JuliaML/LIBSVM.jl)
 
 This is a Julia interface for
